@@ -7,7 +7,7 @@ from typing import Optional, List
 from src.api.blockfrost_client import BlockfrostClient
 from src.models import Block, Transaction, TransactionInput, TransactionOutput, Address
 from src.graph_builder import GraphBuilder
-from src.config import BLOCKFROST_API_KEY, POLLING_INTERVAL, validate_config
+from src.config import BLOCKFROST_API_KEY, POLLING_INTERVAL, NETWORK, validate_config
 from blockfrost import ApiError
 
 # Setup logging
@@ -29,7 +29,7 @@ class DataFetcher:
         validate_config()
         
         self.graph_builder = graph_builder
-        self.api_client = api_client or BlockfrostClient(BLOCKFROST_API_KEY, network='testnet')
+        self.api_client = api_client or BlockfrostClient(BLOCKFROST_API_KEY, network=NETWORK)
         self.running = False
         self.last_block_height: Optional[int] = None
         self.polling_interval = POLLING_INTERVAL
@@ -51,7 +51,19 @@ class DataFetcher:
             
         Returns:
             Block instance
+            
+        Raises:
+            ValueError: If required block data is missing
         """
+        # Validate required fields
+        block_hash = block_data.get('hash')
+        block_height = block_data.get('height')
+        
+        if not block_hash:
+            raise ValueError("block_hash is required in block data")
+        if block_height is None:
+            raise ValueError("block_height is required in block data")
+        
         # Parse timestamp
         timestamp_str = block_data.get('time')
         if isinstance(timestamp_str, str):
@@ -63,8 +75,8 @@ class DataFetcher:
             timestamp = datetime.now()
         
         return Block(
-            block_hash=block_data['hash'],
-            block_height=block_data['height'],
+            block_hash=block_hash,
+            block_height=block_height,
             timestamp=timestamp,
             slot=block_data.get('slot'),
             tx_count=block_data.get('tx_count'),
@@ -81,7 +93,17 @@ class DataFetcher:
             
         Returns:
             Transaction instance
+            
+        Raises:
+            ValueError: If required transaction data is missing
         """
+        # Validate required fields
+        tx_hash = tx_data.get('hash')
+        if not tx_hash:
+            raise ValueError("tx_hash is required in transaction data")
+        if not block_hash:
+            raise ValueError("block_hash is required")
+        
         # Parse inputs
         inputs = []
         for inp_data in tx_data.get('inputs', []):
@@ -94,14 +116,24 @@ class DataFetcher:
         # Parse outputs
         outputs = []
         for out_data in tx_data.get('outputs', []):
-            outputs.append(TransactionOutput(
-                address=out_data.get('address', ''),
-                amount=out_data.get('amount', 0),
-                assets=out_data.get('assets', {}),
-            ))
+            address = out_data.get('address', '')
+            # Skip outputs with empty addresses
+            if address:
+                outputs.append(TransactionOutput(
+                    address=address,
+                    amount=out_data.get('amount', 0),
+                    assets=out_data.get('assets', {}),
+                ))
+        
+        # Validate that we have at least one input and one output
+        # Transactions without inputs/outputs are invalid
+        if not inputs:
+            raise ValueError(f"Transaction {tx_hash} has no inputs")
+        if not outputs:
+            raise ValueError(f"Transaction {tx_hash} has no outputs")
         
         return Transaction(
-            tx_hash=tx_data['hash'],
+            tx_hash=tx_hash,
             block_hash=block_hash,
             block_height=block_height,
             inputs=inputs,
@@ -125,9 +157,25 @@ class DataFetcher:
             self.rate_limit_status = {'limited': False, 'retry_after': None}
             
             # Get latest block (with retry logic from client)
-            block_data = self.api_client.get_latest_block()
-            if not block_data:
+            try:
+                block_data = self.api_client.get_latest_block()
+            except Exception as e:
+                logger.error(f"Error calling get_latest_block: {e}")
                 self.api_status = 'disconnected'
+                self.error_state = str(e)
+                return False
+            
+            if not block_data:
+                logger.warning("get_latest_block returned None or empty data")
+                self.api_status = 'disconnected'
+                self.error_state = "No block data received from API"
+                return False
+            
+            # Validate block data before parsing
+            if not block_data.get('hash') or block_data.get('height') is None:
+                logger.warning(f"Invalid block data received: missing hash or height. Data: {block_data}")
+                self.api_status = 'disconnected'
+                self.error_state = "Invalid block data: missing required fields"
                 return False
             
             block = self.parse_block(block_data)
@@ -139,10 +187,24 @@ class DataFetcher:
             # Add block to graph
             self.graph_builder.add_block(block)
             
-            # Fetch and process transactions
+            # Fetch and process transactions (only if block_hash is valid)
+            if not block.block_hash:
+                logger.warning(f"Block {block.block_height} has no hash, skipping transaction fetch")
+                self.last_block_height = block.block_height
+                self.last_block_fetched = datetime.now()
+                return True
+            
             transactions_data = self.api_client.get_block_transactions(block.block_hash)
+            if not transactions_data:
+                logger.debug(f"No transactions found for block {block.block_hash}")
+            
             for tx_data in transactions_data:
                 try:
+                    # Validate transaction data before parsing
+                    if not tx_data.get('hash'):
+                        logger.warning(f"Skipping transaction with missing hash in block {block.block_hash}")
+                        continue
+                    
                     transaction = self.parse_transaction(tx_data, block.block_hash, block.block_height)
                     self.graph_builder.add_transaction(transaction)
                     
@@ -163,8 +225,14 @@ class DataFetcher:
                         # Update address stats
                         address.update_stats(received=out.amount)
                         self.graph_builder.add_address(address)
+                except ValueError as e:
+                    # ValueError indicates missing required data - log and skip
+                    logger.warning(f"Skipping invalid transaction: {e}")
+                    continue
                 except Exception as e:
-                    logger.warning(f"Error parsing transaction: {e}")
+                    # Other errors - log with more detail
+                    tx_hash = tx_data.get('hash', 'unknown')
+                    logger.warning(f"Error parsing transaction {tx_hash}: {e}")
                     continue
             
             self.last_block_height = block.block_height
@@ -173,24 +241,39 @@ class DataFetcher:
             
         except ApiError as e:
             # Handle API errors (T034, T035)
-            self.consecutive_errors += 1
-            error_msg = str(e)
+            error_status = getattr(e, 'status_code', None)
+            error_message = getattr(e, 'message', str(e))
+            error_type = getattr(e, 'error', 'Unknown')
             
             # Check for rate limit (429)
-            if hasattr(e, 'status_code') and e.status_code == 429:
+            if error_status == 429:
+                self.consecutive_errors += 1
                 self.rate_limit_status = {
                     'limited': True,
                     'retry_after': 30  # Estimate 30 seconds
                 }
                 self.api_status = 'rate_limited'
-                logger.warning(f"Rate limit hit: {e}. Pausing polling.")
+                logger.warning(f"Rate limit hit: {error_message}. Pausing polling.")
                 # Pause polling for backoff period
                 time.sleep(30)
                 return False
-            else:
+            elif error_status == 400:
+                # Bad Request - likely configuration issue, don't retry continuously
+                self.consecutive_errors += 1
                 self.api_status = 'disconnected'
-                self.error_state = error_msg
-                logger.error(f"API error: {e}")
+                self.error_state = f"{error_type}: {error_message}"
+                logger.error(f"Bad Request (400) - API configuration error: {error_message}")
+                # For 400 errors, wait longer before retrying to avoid spam
+                if self.consecutive_errors <= 3:
+                    time.sleep(10)  # Wait 10 seconds before retrying
+                else:
+                    time.sleep(60)  # Wait 60 seconds after 3 consecutive errors
+                return False
+            else:
+                self.consecutive_errors += 1
+                self.api_status = 'disconnected'
+                self.error_state = f"{error_type}: {error_message}"
+                logger.error(f"API error (status {error_status}): {error_message}")
                 # Continue polling loop without crashing (T039)
                 return False
                 

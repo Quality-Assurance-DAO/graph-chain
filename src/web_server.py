@@ -1,13 +1,22 @@
 """Flask web server for Cardano graph visualization."""
 
+import sys
+import os
+from pathlib import Path
+
+# Add project root to Python path to allow absolute imports
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 import time
 import threading
 import json
 import logging
-from flask import Flask, jsonify, Response, send_from_directory
+import socket
+from flask import Flask, jsonify, Response, send_from_directory, request
 from src.graph_builder import GraphBuilder
 from src.data_fetcher import DataFetcher
-from src.config import validate_config
+from src.config import validate_config, SERVER_PORT
 
 # Setup logging (T040)
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +29,9 @@ except ValueError as e:
     print(f"Configuration error: {e}")
 
 # Initialize Flask app
-app = Flask(__name__, static_folder='static')
+# Use absolute path for static folder since we're running from src/
+static_folder_path = project_root / 'static'
+app = Flask(__name__, static_folder=str(static_folder_path))
 
 # Initialize graph and data fetcher
 graph_builder = GraphBuilder()
@@ -58,7 +69,7 @@ def start_background_polling():
 @app.route('/')
 def index():
     """Serve the main visualization page."""
-    return send_from_directory('static', 'index.html')
+    return send_from_directory(str(static_folder_path), 'index.html')
 
 
 @app.route('/api/graph')
@@ -123,10 +134,41 @@ def get_status():
         return jsonify({'error': str(e), 'status': 'error'}), 500
 
 
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 errors gracefully."""
+    # If it's an API request, return JSON
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Not Found', 'path': request.path}), 404
+    # Otherwise, redirect to index (for SPA-like behavior)
+    return send_from_directory(str(static_folder_path), 'index.html'), 200
+
+
+def find_free_port(start_port: int, max_attempts: int = 10) -> int:
+    """Find a free port starting from start_port."""
+    for i in range(max_attempts):
+        port = start_port + i
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.bind(('', port))
+            sock.close()
+            return port
+        except OSError:
+            sock.close()
+            continue
+    raise RuntimeError(f"Could not find a free port starting from {start_port}")
+
+
 if __name__ == '__main__':
     # Start background polling
     start_background_polling()
     
+    # Find an available port
+    port = find_free_port(SERVER_PORT)
+    if port != SERVER_PORT:
+        logger.info(f"Port {SERVER_PORT} is in use, using port {port} instead")
+    
     # Run Flask app
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    logger.info(f"Starting Flask server on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=True)
 

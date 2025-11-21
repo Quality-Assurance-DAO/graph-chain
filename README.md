@@ -4,7 +4,7 @@ Cardano Blockchain Graph Visualization - A proof-of-concept system for visualizi
 
 ## Overview
 
-This project provides a real-time visualization of Cardano blockchain activity, displaying blocks, transactions, and addresses as nodes in a connected graph. The system fetches data from the Cardano testnet via Blockfrost API and renders it using PyVis in a Flask web application.
+This project provides a real-time visualization of Cardano blockchain activity, displaying blocks, transactions, and addresses as nodes in a connected graph. The system fetches data from Cardano networks (mainnet, preview, or preprod) via Blockfrost API and renders it using PyVis in a Flask web application.
 
 ## Features
 
@@ -21,7 +21,9 @@ For detailed setup instructions, see the [Quickstart Guide](specs/001-cardano-gr
 
 - Python 3.10 or higher
 - pip (Python package manager)
-- Blockfrost API key for Cardano testnet ([Get one here](https://blockfrost.io/))
+- Blockfrost API key ([Get one here](https://blockfrost.io/))
+  - For mainnet: Use mainnet API key
+  - For testing: Use preview or preprod API key (testnet is decommissioned)
 
 ### Installation
 
@@ -74,9 +76,15 @@ graph-chain/
 See `config/.env.example` for available configuration options:
 
 - `BLOCKFROST_API_KEY`: Your Blockfrost API key (required)
+- `NETWORK`: Network to use - `mainnet`, `preview`, or `preprod` (default: `mainnet`)
+  - `mainnet`: Production Cardano network
+  - `preview`: Preview testnet (for early-stage testing)
+  - `preprod`: Pre-production testnet (for late-stage testing)
+  - Note: `testnet` is decommissioned but kept for compatibility
 - `POLLING_INTERVAL`: Seconds between API polls (default: 2)
 - `MAX_RETRIES`: Maximum retry attempts (default: 3)
 - `RATE_LIMIT_BACKOFF`: Base seconds for exponential backoff (default: 1)
+- `SERVER_PORT`: Web server port (default: 5001)
 
 ## API Endpoints
 
@@ -107,7 +115,7 @@ pytest tests/
 
 - This is a proof-of-concept - not production-ready
 - Data is stored in-memory only (lost on restart)
-- Focuses on Cardano testnet only
+- Supports mainnet, preview, and preprod networks
 - Designed for single-user, local development use
 
 ## License

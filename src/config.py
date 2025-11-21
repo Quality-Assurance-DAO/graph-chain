@@ -23,6 +23,17 @@ POLLING_INTERVAL: int = int(get_env('POLLING_INTERVAL', '2'))
 MAX_RETRIES: int = int(get_env('MAX_RETRIES', '3'))
 RATE_LIMIT_BACKOFF: int = int(get_env('RATE_LIMIT_BACKOFF', '1'))
 
+# Server Configuration
+SERVER_PORT: int = int(get_env('SERVER_PORT', '5001'))
+
+# Graph Configuration
+MAX_NODES: int = int(get_env('MAX_NODES', '30'))  # Maximum number of nodes in the graph
+
+# Network Configuration
+# Supported: 'mainnet', 'preview', 'preprod'
+# Note: 'testnet' is decommissioned, use 'preview' or 'preprod' for testing
+NETWORK: str = get_env('NETWORK', 'mainnet')
+
 
 def validate_config():
     """Validate that required configuration is present."""

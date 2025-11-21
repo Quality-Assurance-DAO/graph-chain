@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Any, Callable
 import networkx as nx
 
 from src.models import Block, Transaction, Address
+from src.config import MAX_NODES
 
 
 class GraphBuilder:

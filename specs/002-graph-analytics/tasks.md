@@ -33,9 +33,9 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T001 Verify existing project structure (src/, static/, tests/unit/, tests/integration/) supports analytics extensions
-- [ ] T002 Verify requirements.txt includes NetworkX 3.0+ and Flask 3.x (no new dependencies required per plan.md)
-- [ ] T003 Create feature branch `002-graph-analytics` from main branch if not already created
+- [X] T001 Verify existing project structure (src/, static/, tests/unit/, tests/integration/) supports analytics extensions
+- [X] T002 Verify requirements.txt includes NetworkX 3.0+ and Flask 3.x (no new dependencies required per plan.md)
+- [X] T003 Create feature branch `002-graph-analytics` from main branch if not already created
 
 ---
 
@@ -49,14 +49,14 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T004 Create src/analytics_engine.py with AnalyticsEngine class skeleton that wraps GraphBuilder instance
-- [ ] T005 [P] Implement graph update listener in src/analytics_engine.py to register callbacks for node/edge additions and mark metrics as dirty
-- [ ] T006 [P] Implement caching infrastructure in src/analytics_engine.py with dirty flags for degree, activity, anomaly, cluster, and flow metrics
-- [ ] T007 [P] Implement incremental update tracking in src/analytics_engine.py to track which nodes/edges changed since last calculation
-- [ ] T008 Implement statistics calculation helper methods in src/analytics_engine.py for mean, std, percentiles using Python standard library or NumPy if available
-- [ ] T009 [P] Implement HSL to RGB color conversion utility in src/analytics_engine.py for color scheme mapping
-- [ ] T010 [P] Implement color scheme mapping logic in src/analytics_engine.py supporting heatmap, activity, and grayscale schemes
-- [ ] T011 Create tests/unit/test_analytics_engine.py with test fixtures for AnalyticsEngine initialization and GraphBuilder mocking
+- [X] T004 Create src/analytics_engine.py with AnalyticsEngine class skeleton that wraps GraphBuilder instance
+- [X] T005 [P] Implement graph update listener in src/analytics_engine.py to register callbacks for node/edge additions and mark metrics as dirty
+- [X] T006 [P] Implement caching infrastructure in src/analytics_engine.py with dirty flags for degree, activity, anomaly, cluster, and flow metrics
+- [X] T007 [P] Implement incremental update tracking in src/analytics_engine.py to track which nodes/edges changed since last calculation
+- [X] T008 Implement statistics calculation helper methods in src/analytics_engine.py for mean, std, percentiles using Python standard library or NumPy if available
+- [X] T009 [P] Implement HSL to RGB color conversion utility in src/analytics_engine.py for color scheme mapping
+- [X] T010 [P] Implement color scheme mapping logic in src/analytics_engine.py supporting heatmap, activity, and grayscale schemes
+- [X] T011 Create tests/unit/test_analytics_engine.py with test fixtures for AnalyticsEngine initialization and GraphBuilder mocking
 
 ---
 
@@ -76,15 +76,15 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T012 [US1] Implement calculate_node_degrees() method in src/analytics_engine.py to compute in_degree, out_degree, total_degree for all nodes using NetworkX G.degree(), G.in_degree(), G.out_degree()
-- [ ] T013 [US1] Implement calculate_type_specific_degree() method in src/analytics_engine.py to compute type-specific degrees (block_tx edges for blocks, tx_input/tx_output edges for transactions, UTxO count for addresses)
-- [ ] T014 [US1] Implement store_degree_metrics() method in src/analytics_engine.py to store degree metrics as node attributes (degree, in_degree, out_degree, type_degree) in NetworkX graph
-- [ ] T015 [US1] Implement get_degree_metrics() API method in src/analytics_engine.py to return degree metrics filtered by node_type or node_id
-- [ ] T016 [US1] Implement GET /api/analytics/degrees endpoint in src/web_server.py to return degree metrics JSON response per contracts/api.yaml schema
+- [X] T012 [US1] Implement calculate_node_degrees() method in src/analytics_engine.py to compute in_degree, out_degree, total_degree for all nodes using NetworkX G.degree(), G.in_degree(), G.out_degree()
+- [X] T013 [US1] Implement calculate_type_specific_degree() method in src/analytics_engine.py to compute type-specific degrees (block_tx edges for blocks, tx_input/tx_output edges for transactions, UTxO count for addresses)
+- [X] T014 [US1] Implement store_degree_metrics() method in src/analytics_engine.py to store degree metrics as node attributes (degree, in_degree, out_degree, type_degree) in NetworkX graph
+- [X] T015 [US1] Implement get_degree_metrics() API method in src/analytics_engine.py to return degree metrics filtered by node_type or node_id
+- [X] T016 [US1] Implement GET /api/analytics/degrees endpoint in src/web_server.py to return degree metrics JSON response per contracts/api.yaml schema
 - [ ] T017 [US1] Add degree metrics display to static/index.html to show transaction counts on block nodes and input/output counts on transaction nodes in node labels or tooltips
-- [ ] T018 [US1] Integrate AnalyticsEngine with GraphBuilder in src/web_server.py by creating AnalyticsEngine instance wrapping graph_builder
-- [ ] T019 [US1] Add unit tests for calculate_node_degrees() in tests/unit/test_analytics_engine.py with sample graph data
-- [ ] T020 [US1] Add unit tests for get_degree_metrics() filtering in tests/unit/test_analytics_engine.py
+- [X] T018 [US1] Integrate AnalyticsEngine with GraphBuilder in src/web_server.py by creating AnalyticsEngine instance wrapping graph_builder
+- [X] T019 [US1] Add unit tests for calculate_node_degrees() in tests/unit/test_analytics_engine.py with sample graph data
+- [X] T020 [US1] Add unit tests for get_degree_metrics() filtering in tests/unit/test_analytics_engine.py
 - [ ] T021 [US1] Add integration test for GET /api/analytics/degrees endpoint in tests/integration/test_end_to_end.py
 
 ---
@@ -105,12 +105,12 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T022 [US2] Implement calculate_activity_metrics() method in src/analytics_engine.py to compute raw activity values (tx_count for blocks, input+output count for transactions, UTxO count for addresses)
-- [ ] T023 [US2] Implement normalize_activity_values() method in src/analytics_engine.py to normalize activity values to 0-100 scale per metric type independently
-- [ ] T024 [US2] Implement apply_color_coding() method in src/analytics_engine.py to map normalized activity values to HSL colors using heatmap scheme (red → yellow → green) and convert to hex
-- [ ] T025 [US2] Implement store_color_attributes() method in src/analytics_engine.py to store color_hex and color_scheme as node attributes in NetworkX graph
-- [ ] T026 [US2] Implement get_activity_metrics() API method in src/analytics_engine.py to return activity metrics and color mappings filtered by node_type and color_scheme
-- [ ] T027 [US2] Implement GET /api/analytics/activity endpoint in src/web_server.py to return activity metrics JSON response per contracts/api.yaml schema with color_scheme parameter support
+- [X] T022 [US2] Implement calculate_activity_metrics() method in src/analytics_engine.py to compute raw activity values (tx_count for blocks, input+output count for transactions, UTxO count for addresses)
+- [X] T023 [US2] Implement normalize_activity_values() method in src/analytics_engine.py to normalize activity values to 0-100 scale per metric type independently
+- [X] T024 [US2] Implement apply_color_coding() method in src/analytics_engine.py to map normalized activity values to HSL colors using heatmap scheme (red → yellow → green) and convert to hex
+- [X] T025 [US2] Implement store_color_attributes() method in src/analytics_engine.py to store color_hex and color_scheme as node attributes in NetworkX graph
+- [X] T026 [US2] Implement get_activity_metrics() API method in src/analytics_engine.py to return activity metrics and color mappings filtered by node_type and color_scheme
+- [X] T027 [US2] Implement GET /api/analytics/activity endpoint in src/web_server.py to return activity metrics JSON response per contracts/api.yaml schema with color_scheme parameter support
 - [ ] T028 [US2] Add color coding visualization to static/index.html to apply node colors from activity metrics API response using PyVis node color attribute
 - [ ] T029 [US2] Add color scheme selector UI control to static/index.html allowing users to switch between heatmap, activity, and grayscale schemes
 
@@ -132,14 +132,14 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T030 [US3] Implement calculate_statistics() method in src/analytics_engine.py to compute mean, std, percentiles for transaction values and block transaction counts
-- [ ] T031 [US3] Implement detect_anomalies_zscore() method in src/analytics_engine.py to flag nodes where |value - mean| > 2 * std for normally distributed metrics
-- [ ] T032 [US3] Implement detect_anomalies_percentile() method in src/analytics_engine.py to flag nodes above 95th percentile or below 5th percentile for skewed distributions
-- [ ] T033 [US3] Implement detect_anomalies_threshold() method in src/analytics_engine.py to flag nodes where value > threshold * average for small datasets
-- [ ] T034 [US3] Implement detect_anomalies() unified method in src/analytics_engine.py to select appropriate detection method and calculate anomaly scores (0-100)
-- [ ] T035 [US3] Implement store_anomaly_attributes() method in src/analytics_engine.py to store is_anomaly, anomaly_score, anomaly_type as node attributes in NetworkX graph
-- [ ] T036 [US3] Implement get_anomalies() API method in src/analytics_engine.py to return anomaly detection results filtered by node_type and method parameter
-- [ ] T037 [US3] Implement GET /api/analytics/anomalies endpoint in src/web_server.py to return anomaly detection JSON response per contracts/api.yaml schema with method and threshold parameters, returning 400 error if < 10 nodes
+- [X] T030 [US3] Implement calculate_statistics() method in src/analytics_engine.py to compute mean, std, percentiles for transaction values and block transaction counts
+- [X] T031 [US3] Implement detect_anomalies_zscore() method in src/analytics_engine.py to flag nodes where |value - mean| > 2 * std for normally distributed metrics
+- [X] T032 [US3] Implement detect_anomalies_percentile() method in src/analytics_engine.py to flag nodes above 95th percentile or below 5th percentile for skewed distributions
+- [X] T033 [US3] Implement detect_anomalies_threshold() method in src/analytics_engine.py to flag nodes where value > threshold * average for small datasets
+- [X] T034 [US3] Implement detect_anomalies() unified method in src/analytics_engine.py to select appropriate detection method and calculate anomaly scores (0-100)
+- [X] T035 [US3] Implement store_anomaly_attributes() method in src/analytics_engine.py to store is_anomaly, anomaly_score, anomaly_type as node attributes in NetworkX graph
+- [X] T036 [US3] Implement get_anomalies() API method in src/analytics_engine.py to return anomaly detection results filtered by node_type and method parameter
+- [X] T037 [US3] Implement GET /api/analytics/anomalies endpoint in src/web_server.py to return anomaly detection JSON response per contracts/api.yaml schema with method and threshold parameters, returning 400 error if < 10 nodes
 - [ ] T038 [US3] Add anomaly highlighting visualization to static/index.html to visually distinguish anomalous nodes using border, glow effect, or distinct styling
 
 ---
@@ -160,14 +160,14 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T039 [US4] Implement get_recent_blocks() method in src/analytics_engine.py to filter graph to nodes from last N blocks (configurable time_window_blocks parameter)
-- [ ] T040 [US4] Implement create_address_subgraph() method in src/analytics_engine.py to create undirected subgraph of address-address connections for address clustering
-- [ ] T041 [US4] Implement create_transaction_subgraph() method in src/analytics_engine.py to create undirected subgraph of transaction-transaction connections for transaction clustering
-- [ ] T042 [US4] Implement cluster_addresses() method in src/analytics_engine.py using NetworkX nx.community.greedy_modularity_communities() algorithm on address subgraph
-- [ ] T043 [US4] Implement cluster_transactions() method in src/analytics_engine.py using NetworkX nx.community.greedy_modularity_communities() algorithm on transaction subgraph
-- [ ] T044 [US4] Implement store_cluster_attributes() method in src/analytics_engine.py to assign cluster_id, cluster_type, cluster_color as node attributes in NetworkX graph
-- [ ] T045 [US4] Implement get_clusters() API method in src/analytics_engine.py to return cluster assignments filtered by cluster_type and time_window_blocks parameter
-- [ ] T046 [US4] Implement GET /api/analytics/clusters endpoint in src/web_server.py to return cluster JSON response per contracts/api.yaml schema with cluster_type and time_window_blocks parameters
+- [X] T039 [US4] Implement get_recent_blocks() method in src/analytics_engine.py to filter graph to nodes from last N blocks (configurable time_window_blocks parameter)
+- [X] T040 [US4] Implement create_address_subgraph() method in src/analytics_engine.py to create undirected subgraph of address-address connections for address clustering
+- [X] T041 [US4] Implement create_transaction_subgraph() method in src/analytics_engine.py to create undirected subgraph of transaction-transaction connections for transaction clustering
+- [X] T042 [US4] Implement cluster_addresses() method in src/analytics_engine.py using NetworkX nx.community.greedy_modularity_communities() algorithm on address subgraph
+- [X] T043 [US4] Implement cluster_transactions() method in src/analytics_engine.py using NetworkX nx.community.greedy_modularity_communities() algorithm on transaction subgraph
+- [X] T044 [US4] Implement store_cluster_attributes() method in src/analytics_engine.py to assign cluster_id, cluster_type, cluster_color as node attributes in NetworkX graph
+- [X] T045 [US4] Implement get_clusters() API method in src/analytics_engine.py to return cluster assignments filtered by cluster_type and time_window_blocks parameter
+- [X] T046 [US4] Implement GET /api/analytics/clusters endpoint in src/web_server.py to return cluster JSON response per contracts/api.yaml schema with cluster_type and time_window_blocks parameters
 
 ---
 
@@ -187,12 +187,12 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T047 [US5] Implement find_flow_paths_from_address() method in src/analytics_engine.py using NetworkX nx.all_simple_paths() to find paths from input addresses through transactions to output addresses
-- [ ] T048 [US5] Implement find_flow_paths_from_transaction() method in src/analytics_engine.py to find flow paths when user clicks a transaction node
-- [ ] T049 [US5] Implement aggregate_path_values() method in src/analytics_engine.py to sum edge weights (transaction output amounts) along flow paths
-- [ ] T050 [US5] Implement limit_path_depth() method in src/analytics_engine.py to limit paths to max_depth (5-10 hops) and filter to recent blocks (last 5-10 blocks)
-- [ ] T051 [US5] Implement get_flow_paths() API method in src/analytics_engine.py to return flow paths filtered by start_address, transaction_id, max_depth, and max_blocks parameters
-- [ ] T052 [US5] Implement GET /api/analytics/flow endpoint in src/web_server.py to return flow paths JSON response per contracts/api.yaml schema with query parameters
+- [X] T047 [US5] Implement find_flow_paths_from_address() method in src/analytics_engine.py using NetworkX nx.all_simple_paths() to find paths from input addresses through transactions to output addresses
+- [X] T048 [US5] Implement find_flow_paths_from_transaction() method in src/analytics_engine.py to find flow paths when user clicks a transaction node
+- [X] T049 [US5] Implement aggregate_path_values() method in src/analytics_engine.py to sum edge weights (transaction output amounts) along flow paths
+- [X] T050 [US5] Implement limit_path_depth() method in src/analytics_engine.py to limit paths to max_depth (5-10 hops) and filter to recent blocks (last 5-10 blocks)
+- [X] T051 [US5] Implement get_flow_paths() API method in src/analytics_engine.py to return flow paths filtered by start_address, transaction_id, max_depth, and max_blocks parameters
+- [X] T052 [US5] Implement GET /api/analytics/flow endpoint in src/web_server.py to return flow paths JSON response per contracts/api.yaml schema with query parameters
 - [ ] T053 [US5] Add flow path visualization to static/index.html to highlight flow paths when user clicks a transaction node, showing path edges with distinct colors and widths
 
 ---
@@ -205,9 +205,9 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T054 Implement POST /api/analytics/recalculate endpoint in src/web_server.py to trigger recalculation of all analytics metrics asynchronously, returning 202 Accepted response
-- [ ] T055 Add comprehensive unit tests for all analytics calculation methods in tests/unit/test_analytics_engine.py covering edge cases (empty graphs, single node, identical values, etc.)
-- [ ] T056 Add integration tests for all analytics API endpoints in tests/integration/test_end_to_end.py verifying end-to-end data flow
+- [X] T054 Implement POST /api/analytics/recalculate endpoint in src/web_server.py to trigger recalculation of all analytics metrics asynchronously, returning 202 Accepted response
+- [X] T055 Add comprehensive unit tests for all analytics calculation methods in tests/unit/test_analytics_engine.py covering edge cases (empty graphs, single node, identical values, etc.)
+- [X] T056 Add integration tests for all analytics API endpoints in tests/integration/test_end_to_end.py verifying end-to-end data flow
 - [ ] T057 Add loading indicator UI component to static/index.html to show spinner/progress message during analytics calculations
 - [ ] T058 Update README.md with analytics feature documentation including API usage examples and quickstart guide reference
 

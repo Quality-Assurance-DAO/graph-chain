@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cardano Blockchain Graph Visualization</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        #header {
+            background-color: #2d2d2d;
+            padding: 15px 20px;
+            border-bottom: 2px solid #3d3d3d;
+        }
+        #header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #00d4ff;
+        }
+        #status {
+            display: inline-block;
+            margin-left: 20px;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .status-active {
+            background-color: #4caf50;
+            color: white;
+        }
+        .status-paused {
+            background-color: #ff9800;
+            color: white;
+        }
+        .status-error {
+            background-color: #f44336;
+            color: white;
+        }
+        #graph-container {
+            width: 100%;
+            height: calc(100vh - 80px);
+            background-color: #1a1a1a;
+        }
+        #info-panel {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            width: 300px;
+            background-color: rgba(45, 45, 45, 0.9);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+        #info-panel h3 {
+            margin-top: 0;
+            color: #00d4ff;
+        }
+        .info-item {
+            margin: 10px 0;
+            padding: 5px;
+            border-bottom: 1px solid #3d3d3d;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #aaaaaa;
+        }
+        .info-value {
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>Cardano Blockchain Graph Visualization</h1>
+        <span id="status" class="status-active">Loading...</span>
+    </div>
+    <div id="graph-container"></div>
+    <div id="info-panel">
+        <h3>Graph Statistics</h3>
+        <div class="info-item">
+            <span class="info-label">Nodes:</span>
+            <span class="info-value" id="node-count">0</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Edges:</span>
+            <span class="info-value" id="edge-count">0</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Latest Block:</span>
+            <span class="info-value" id="latest-block">-</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Last Update:</span>
+            <span class="info-value" id="last-update">-</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">API Status:</span>
+            <span class="info-value" id="api-status">-</span>
+        </div>
+        <div class="info-item" id="rate-limit-warning" style="display: none;">
+            <span class="info-label" style="color: #ff9800;">Rate Limited:</span>
+            <span class="info-value" style="color: #ff9800;" id="rate-limit-info">-</span>
+        </div>
+        <div class="info-item" id="error-warning" style="display: none;">
+            <span class="info-label" style="color: #f44336;">Error:</span>
+            <span class="info-value" style="color: #f44336;" id="error-message">-</span>
+        </div>
+    </div>
+
+    <script>
+        // Initialize network
+        let network = null;
+        let nodes = new vis.DataSet([]);
+        let edges = new vis.DataSet([]);
+        
+        const container = document.getElementById('graph-container');
+        const data = { nodes: nodes, edges: edges };
+        
+        const options = {
+            nodes: {
+                shape: 'dot',
+                size: 20,
+                font: {
+                    size: 12,
+                    color: '#ffffff',
+                    face: 'Arial'
+                },
+                borderWidth: 2,
+                shadow: true,
+                chosen: {
+                    node: function(values, id, selected, hovering) {
+                        if (hovering || selected) {
+                            values.size = 30;
+                            values.borderWidth = 4;
+                        }
+                    }
+                }
+            },
+            edges: {
+                width: 2,
+                color: { color: '#848484' },
+                smooth: {
+                    type: 'continuous',
+                    roundness: 0.5
+                },
+                arrows: {
+                    to: { enabled: true, scaleFactor: 0.8, length: 15 }
+                },
+                font: {
+                    size: 11,
+                    color: '#ffffff',
+                    align: 'middle',
+                    background: 'rgba(0,0,0,0.7)',
+                    strokeWidth: 2,
+                    strokeColor: '#000000'
+                },
+                labelHighlightBold: true,
+                chosen: {
+                    edge: function(values, id, selected, hovering) {
+                        if (hovering || selected) {
+                            values.width = 4;
+                            values.color = { color: '#00d4ff' };
+                        }
+                    }
+                }
+            },
+            physics: {
+                enabled: true,
+                stabilization: {
+                    iterations: 100
+                }
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 100
+            }
+        };
+        
+        network = new vis.Network(container, data, options);
+        
+        // Node styling based on type (T032 - visual distinction)
+        network.on('stabilizationEnd', function() {
+            updateNodeStyles();
+        });
+        
+        function updateNodeStyles() {
+            const nodeTypes = {
+                'block': { 
+                    color: { background: '#00d4ff', border: '#0099cc', highlight: { background: '#33ddff', border: '#00d4ff' } },
+                    shape: 'box',
+                    size: 25
+                },
+                'transaction': { 
+                    color: { background: '#ff6b6b', border: '#cc5555', highlight: { background: '#ff8888', border: '#ff6b6b' } },
+                    shape: 'diamond',
+                    size: 22
+                },
+                'address': { 
+                    color: { background: '#4ecdc4', border: '#3ba89f', highlight: { background: '#6eddd4', border: '#4ecdc4' } },
+                    shape: 'dot',
+                    size: 18
+                }
+            };
+            
+            nodes.forEach(function(node) {
+                const typeStyle = nodeTypes[node.type] || { 
+                    color: { background: '#848484', border: '#666666' },
+                    shape: 'dot',
+                    size: 16
+                };
+                nodes.update({
+                    id: node.id,
+                    color: typeStyle.color,
+                    shape: typeStyle.shape,
+                    size: typeStyle.size
+                });
+            });
+        }
+        
+        // Node interaction handlers (T031 - highlight connected nodes)
+        let highlightedNodes = new Set();
+        let highlightedEdges = new Set();
+        
+        network.on('hoverNode', function(params) {
+            highlightConnectedNodes(params.node);
+        });
+        
+        network.on('blurNode', function(params) {
+            unhighlightNodes();
+        });
+        
+        network.on('click', function(params) {
+            if (params.nodes.length > 0) {
+                highlightConnectedNodes(params.nodes[0]);
+            } else {
+                unhighlightNodes();
+            }
+        });
+        
+        function highlightConnectedNodes(nodeId) {
+            unhighlightNodes();
+            
+            // Get all connected nodes
+            const connectedNodeIds = new Set();
+            const connectedEdgeIds = new Set();
+            
+            // Get edges connected to this node
+            edges.forEach(function(edge) {
+                if (edge.from === nodeId || edge.to === nodeId) {
+                    connectedEdgeIds.add(edge.id);
+                    if (edge.from === nodeId) connectedNodeIds.add(edge.to);
+                    if (edge.to === nodeId) connectedNodeIds.add(edge.from);
+                }
+            });
+            
+            // Highlight connected nodes and edges
+            connectedNodeIds.forEach(function(id) {
+                highlightedNodes.add(id);
+                nodes.update({ id: id, opacity: 0.3 });
+            });
+            highlightedEdges = connectedEdgeIds;
+            edges.forEach(function(edge) {
+                if (connectedEdgeIds.has(edge.id)) {
+                    edges.update({ id: edge.id, color: { color: '#00d4ff', highlight: '#00d4ff' } });
+                } else {
+                    edges.update({ id: edge.id, opacity: 0.1 });
+                }
+            });
+            
+            // Keep selected node fully visible
+            nodes.update({ id: nodeId, opacity: 1 });
+        }
+        
+        function unhighlightNodes() {
+            highlightedNodes.forEach(function(id) {
+                nodes.update({ id: id, opacity: 1 });
+            });
+            highlightedNodes.clear();
+            
+            edges.forEach(function(edge) {
+                edges.update({ id: edge.id, opacity: 1, color: { color: '#848484' } });
+            });
+            highlightedEdges.clear();
+        }
+        
+        // Load initial graph state
+        function loadGraph() {
+            fetch('/api/graph')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.nodes && data.edges) {
+                        nodes.clear();
+                        edges.clear();
+                        nodes.add(data.nodes.map(node => ({
+                            id: node.id,
+                            label: node.label || node.id,
+                            type: node.type,
+                            title: JSON.stringify(node.data, null, 2)
+                        })));
+                        edges.add(data.edges.map(edge => {
+                            // Enhanced edge labeling (T030 - show amounts and types)
+                            let edgeLabel = edge.label || '';
+                            let edgeTitle = `Type: ${edge.type}`;
+                            
+                            if (edge.type === 'tx_output' && edge.weight) {
+                                edgeTitle += `\nAmount: ${edge.label || edge.weight}`;
+                            } else if (edge.type === 'tx_input') {
+                                edgeTitle += '\nInput connection';
+                            } else if (edge.type === 'block_tx') {
+                                edgeTitle += '\nBlock contains transaction';
+                            }
+                            
+                            return {
+                                id: edge.from + '-' + edge.to,
+                                from: edge.from,
+                                to: edge.to,
+                                label: edgeLabel,
+                                title: edgeTitle,
+                                type: edge.type,
+                                weight: edge.weight || 1
+                            };
+                        }));
+                        updateNodeStyles();
+                        updateStats(data.metadata);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading graph:', error);
+                    updateStatus('error', 'Error loading graph');
+                });
+        }
+        
+        // Update statistics display
+        function updateStats(metadata) {
+            if (metadata) {
+                document.getElementById('node-count').textContent = metadata.node_count || 0;
+                document.getElementById('edge-count').textContent = metadata.edge_count || 0;
+                document.getElementById('latest-block').textContent = metadata.latest_block_height || '-';
+                document.getElementById('last-update').textContent = 
+                    metadata.last_update ? new Date(metadata.last_update).toLocaleTimeString() : '-';
+            }
+        }
+        
+        // Update status indicator
+        function updateStatus(status, message) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = 'status-' + status;
+            statusEl.textContent = message;
+        }
+        
+        // Connect to SSE stream for real-time updates
+        function connectSSE() {
+            const eventSource = new EventSource('/api/graph/updates');
+            
+            eventSource.addEventListener('graph_update', function(event) {
+                try {
+                    const update = JSON.parse(event.data);
+                    handleGraphUpdate(update);
+                } catch (error) {
+                    console.error('Error parsing SSE update:', error);
+                }
+            });
+            
+            eventSource.onerror = function(error) {
+                console.error('SSE error:', error);
+                eventSource.close();
+                // Retry connection after delay
+                setTimeout(connectSSE, 5000);
+            };
+        }
+        
+        // Handle graph update events
+        function handleGraphUpdate(update) {
+            if (update.type === 'node_added' && update.node) {
+                const node = update.node;
+                nodes.add({
+                    id: node.id,
+                    label: node.data.label || node.id,
+                    type: node.type,
+                    title: JSON.stringify(node.data, null, 2)
+                });
+                updateNodeStyles();
+            } else if (update.type === 'edge_added' && update.edge) {
+                const edge = update.edge;
+                let edgeTitle = `Type: ${edge.type}`;
+                if (edge.type === 'tx_output' && edge.weight) {
+                    edgeTitle += `\nAmount: ${edge.label || edge.weight}`;
+                }
+                edges.add({
+                    id: edge.from + '-' + edge.to,
+                    from: edge.from,
+                    to: edge.to,
+                    label: edge.label || '',
+                    title: edgeTitle,
+                    type: edge.type,
+                    weight: edge.weight || 1
+                });
+            }
+            
+            // Refresh stats periodically
+            loadGraph();
+        }
+        
+        // Check system status (T038 - status display UI)
+        function checkStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    updateStatus(data.status || 'active', data.status || 'Active');
+                    
+                    // Update API status
+                    document.getElementById('api-status').textContent = data.api_status || '-';
+                    
+                    // Update rate limit warning (T038)
+                    const rateLimitWarning = document.getElementById('rate-limit-warning');
+                    const rateLimitInfo = document.getElementById('rate-limit-info');
+                    if (data.rate_limit_status && data.rate_limit_status.limited) {
+                        rateLimitWarning.style.display = 'block';
+                        const retryAfter = data.rate_limit_status.retry_after || 'unknown';
+                        rateLimitInfo.textContent = `Retry in ${retryAfter}s`;
+                    } else {
+                        rateLimitWarning.style.display = 'none';
+                    }
+                    
+                    // Update error warning (T038, T040)
+                    const errorWarning = document.getElementById('error-warning');
+                    const errorMessage = document.getElementById('error-message');
+                    if (data.error_message) {
+                        errorWarning.style.display = 'block';
+                        errorMessage.textContent = data.error_message.substring(0, 50) + '...';
+                    } else {
+                        errorWarning.style.display = 'none';
+                    }
+                    
+                    // Update last block fetched
+                    if (data.last_block_fetched) {
+                        document.getElementById('last-update').textContent = 
+                            new Date(data.last_block_fetched).toLocaleTimeString();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking status:', error);
+                    updateStatus('error', 'Status check failed');
+                });
+        }
+        
+        // Initialize
+        loadGraph();
+        connectSSE();
+        checkStatus();
+        setInterval(checkStatus, 10000); // Check status every 10 seconds
+    </script>
+</body>
+</html>
+

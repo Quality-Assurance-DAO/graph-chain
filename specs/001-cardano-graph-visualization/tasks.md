@@ -31,12 +31,12 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T001 Create project directory structure (src/, static/, tests/unit/, tests/integration/, config/)
-- [ ] T002 Create requirements.txt with Flask 3.x, NetworkX, PyVis, blockfrost-python, requests, tenacity, python-dotenv, pytest, pytest-asyncio
-- [ ] T003 Create config/.env.example with BLOCKFROST_API_KEY, POLLING_INTERVAL, MAX_RETRIES, RATE_LIMIT_BACKOFF placeholders
-- [ ] T004 Create README.md with project overview, setup instructions, and quickstart guide reference
-- [ ] T005 Create .gitignore with Python patterns, venv/, .env, __pycache__/, *.pyc
-- [ ] T006 Create pytest.ini or pyproject.toml with pytest configuration for tests/ directory
+- [X] T001 Create project directory structure (src/, static/, tests/unit/, tests/integration/, config/)
+- [X] T002 Create requirements.txt with Flask 3.x, NetworkX, PyVis, blockfrost-python, requests, tenacity, python-dotenv, pytest, pytest-asyncio
+- [X] T003 Create config/.env.example with BLOCKFROST_API_KEY, POLLING_INTERVAL, MAX_RETRIES, RATE_LIMIT_BACKOFF placeholders
+- [X] T004 Create README.md with project overview, setup instructions, and quickstart guide reference
+- [X] T005 Create .gitignore with Python patterns, venv/, .env, __pycache__/, *.pyc
+- [X] T006 Create pytest.ini or pyproject.toml with pytest configuration for tests/ directory
 
 ---
 
@@ -50,14 +50,14 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T007 [P] Create src/models/__init__.py for models package
-- [ ] T008 [P] Implement Block model class in src/models/block.py with block_hash, block_height, timestamp, slot, tx_count attributes
-- [ ] T009 [P] Implement Transaction model class in src/models/transaction.py with tx_hash, block_hash, inputs, outputs, fee attributes and nested TransactionInput/TransactionOutput classes
-- [ ] T010 [P] Implement Address model class in src/models/address.py with address, first_seen, total_received, total_sent, transaction_count attributes
-- [ ] T011 Create src/graph_builder.py with GraphBuilder class using NetworkX DiGraph, implementing add_block(), add_transaction(), add_address() methods
-- [ ] T012 [P] Create src/api/__init__.py for API package
-- [ ] T013 [P] Create src/api/blockfrost_client.py with BlockfrostClient class using blockfrost-python SDK, implementing get_latest_block(), get_block_transactions() methods with basic error handling
-- [ ] T014 Create src/config.py module to load environment variables using python-dotenv, providing BLOCKFROST_API_KEY, POLLING_INTERVAL, MAX_RETRIES, RATE_LIMIT_BACKOFF configuration values
+- [X] T007 [P] Create src/models/__init__.py for models package
+- [X] T008 [P] Implement Block model class in src/models/block.py with block_hash, block_height, timestamp, slot, tx_count attributes
+- [X] T009 [P] Implement Transaction model class in src/models/transaction.py with tx_hash, block_hash, inputs, outputs, fee attributes and nested TransactionInput/TransactionOutput classes
+- [X] T010 [P] Implement Address model class in src/models/address.py with address, first_seen, total_received, total_sent, transaction_count attributes
+- [X] T011 Create src/graph_builder.py with GraphBuilder class using NetworkX DiGraph, implementing add_block(), add_transaction(), add_address() methods
+- [X] T012 [P] Create src/api/__init__.py for API package
+- [X] T013 [P] Create src/api/blockfrost_client.py with BlockfrostClient class using blockfrost-python SDK, implementing get_latest_block(), get_block_transactions() methods with basic error handling
+- [X] T014 Create src/config.py module to load environment variables using python-dotenv, providing BLOCKFROST_API_KEY, POLLING_INTERVAL, MAX_RETRIES, RATE_LIMIT_BACKOFF configuration values
 
 ---
 
@@ -77,18 +77,18 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T015 [US1] Implement data polling loop in src/data_fetcher.py with DataFetcher class, polling Blockfrost API at configured interval for latest blocks
-- [ ] T016 [US1] Implement block parsing in src/data_fetcher.py to convert Blockfrost API responses to Block model instances
-- [ ] T017 [US1] Implement transaction parsing in src/data_fetcher.py to convert Blockfrost API transaction data to Transaction model instances with inputs and outputs
-- [ ] T018 [US1] Integrate DataFetcher with GraphBuilder in src/data_fetcher.py to automatically add fetched blocks and transactions to graph structure
-- [ ] T019 [US1] Create Flask app structure in src/web_server.py with Flask application initialization and basic route setup
-- [ ] T020 [US1] Implement GET / route in src/web_server.py to serve static/index.html visualization page
-- [ ] T021 [US1] Implement GET /api/graph route in src/web_server.py to return current graph state as JSON with nodes, edges, and metadata
-- [ ] T022 [US1] Create static/index.html with PyVis network visualization, embedded JavaScript for graph rendering, and basic styling
-- [ ] T023 [US1] Implement graph state serialization in src/graph_builder.py to convert NetworkX graph to JSON format compatible with PyVis (nodes array, edges array)
-- [ ] T024 [US1] Implement GET /api/graph/updates route in src/web_server.py with Server-Sent Events (SSE) streaming for real-time graph updates
-- [ ] T025 [US1] Implement graph update event generation in src/graph_builder.py to emit node_added and edge_added events when graph is updated
-- [ ] T026 [US1] Integrate DataFetcher polling loop with Flask app in src/web_server.py using background thread or async task to continuously fetch and update graph
+- [X] T015 [US1] Implement data polling loop in src/data_fetcher.py with DataFetcher class, polling Blockfrost API at configured interval for latest blocks
+- [X] T016 [US1] Implement block parsing in src/data_fetcher.py to convert Blockfrost API responses to Block model instances
+- [X] T017 [US1] Implement transaction parsing in src/data_fetcher.py to convert Blockfrost API transaction data to Transaction model instances with inputs and outputs
+- [X] T018 [US1] Integrate DataFetcher with GraphBuilder in src/data_fetcher.py to automatically add fetched blocks and transactions to graph structure
+- [X] T019 [US1] Create Flask app structure in src/web_server.py with Flask application initialization and basic route setup
+- [X] T020 [US1] Implement GET / route in src/web_server.py to serve static/index.html visualization page
+- [X] T021 [US1] Implement GET /api/graph route in src/web_server.py to return current graph state as JSON with nodes, edges, and metadata
+- [X] T022 [US1] Create static/index.html with PyVis network visualization, embedded JavaScript for graph rendering, and basic styling
+- [X] T023 [US1] Implement graph state serialization in src/graph_builder.py to convert NetworkX graph to JSON format compatible with PyVis (nodes array, edges array)
+- [X] T024 [US1] Implement GET /api/graph/updates route in src/web_server.py with Server-Sent Events (SSE) streaming for real-time graph updates
+- [X] T025 [US1] Implement graph update event generation in src/graph_builder.py to emit node_added and edge_added events when graph is updated
+- [X] T026 [US1] Integrate DataFetcher polling loop with Flask app in src/web_server.py using background thread or async task to continuously fetch and update graph
 
 ---
 
@@ -108,12 +108,12 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T027 [US2] Enhance graph edge creation in src/graph_builder.py to ensure all transaction input addresses connect to transaction node with tx_input edge type
-- [ ] T028 [US2] Enhance graph edge creation in src/graph_builder.py to ensure all transaction output addresses connect from transaction node with tx_output edge type
-- [ ] T029 [US2] Implement address node aggregation in src/graph_builder.py to update address statistics (transaction_count, total_received, total_sent) when address appears in multiple transactions
-- [ ] T030 [US2] Enhance PyVis visualization in static/index.html to display edge labels showing transaction amounts and edge types (input/output) for better flow understanding
-- [ ] T031 [US2] Implement node interaction handlers in static/index.html JavaScript to highlight connected nodes when hovering or clicking on transactions/addresses
-- [ ] T032 [US2] Add visual distinction in static/index.html for different node types (blocks, transactions, addresses) using different colors, shapes, or sizes in PyVis network
+- [X] T027 [US2] Enhance graph edge creation in src/graph_builder.py to ensure all transaction input addresses connect to transaction node with tx_input edge type
+- [X] T028 [US2] Enhance graph edge creation in src/graph_builder.py to ensure all transaction output addresses connect from transaction node with tx_output edge type
+- [X] T029 [US2] Implement address node aggregation in src/graph_builder.py to update address statistics (transaction_count, total_received, total_sent) when address appears in multiple transactions
+- [X] T030 [US2] Enhance PyVis visualization in static/index.html to display edge labels showing transaction amounts and edge types (input/output) for better flow understanding
+- [X] T031 [US2] Implement node interaction handlers in static/index.html JavaScript to highlight connected nodes when hovering or clicking on transactions/addresses
+- [X] T032 [US2] Add visual distinction in static/index.html for different node types (blocks, transactions, addresses) using different colors, shapes, or sizes in PyVis network
 
 ---
 
@@ -133,14 +133,14 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T033 [US3] Implement exponential backoff retry logic in src/api/blockfrost_client.py using tenacity library to handle 429 rate limit responses
-- [ ] T034 [US3] Implement API error handling in src/data_fetcher.py to catch and log API errors, continue polling loop without crashing on temporary failures
-- [ ] T035 [US3] Add rate limit detection and backoff logic in src/data_fetcher.py to pause polling when rate limited, resume after backoff period
-- [ ] T036 [US3] Implement system status tracking in src/web_server.py to track API connection status, polling status, rate limit status, and error state
-- [ ] T037 [US3] Implement GET /api/status route in src/web_server.py to return system status JSON with api_status, polling_status, rate_limit_status, graph_stats, last_block_fetched
-- [ ] T038 [US3] Add status display UI component in static/index.html to show system status (active/paused/error), API connection status, and rate limit warnings
-- [ ] T039 [US3] Implement graceful degradation in src/data_fetcher.py to continue displaying existing graph data when API is unavailable, with clear status indication
-- [ ] T040 [US3] Add error logging and user feedback in src/web_server.py to log errors to console and include error messages in status endpoint responses
+- [X] T033 [US3] Implement exponential backoff retry logic in src/api/blockfrost_client.py using tenacity library to handle 429 rate limit responses
+- [X] T034 [US3] Implement API error handling in src/data_fetcher.py to catch and log API errors, continue polling loop without crashing on temporary failures
+- [X] T035 [US3] Add rate limit detection and backoff logic in src/data_fetcher.py to pause polling when rate limited, resume after backoff period
+- [X] T036 [US3] Implement system status tracking in src/web_server.py to track API connection status, polling status, rate limit status, and error state
+- [X] T037 [US3] Implement GET /api/status route in src/web_server.py to return system status JSON with api_status, polling_status, rate_limit_status, graph_stats, last_block_fetched
+- [X] T038 [US3] Add status display UI component in static/index.html to show system status (active/paused/error), API connection status, and rate limit warnings
+- [X] T039 [US3] Implement graceful degradation in src/data_fetcher.py to continue displaying existing graph data when API is unavailable, with clear status indication
+- [X] T040 [US3] Add error logging and user feedback in src/web_server.py to log errors to console and include error messages in status endpoint responses
 
 ---
 
@@ -152,11 +152,11 @@ This document provides an actionable, dependency-ordered task list for implement
 
 ### Tasks
 
-- [ ] T041 Create tests/unit/test_data_fetcher.py with unit tests for DataFetcher using mocked Blockfrost API responses
-- [ ] T042 Create tests/unit/test_graph_builder.py with unit tests for GraphBuilder using sample Block, Transaction, Address instances
-- [ ] T043 Create tests/unit/test_web_server.py with Flask test client tests for GET /, GET /api/graph, GET /api/status routes
-- [ ] T044 Create tests/integration/test_end_to_end.py with integration test simulating full data flow from API fetch to graph visualization
-- [ ] T045 Update README.md with complete setup instructions, configuration details, troubleshooting guide, and usage examples
+- [X] T041 Create tests/unit/test_data_fetcher.py with unit tests for DataFetcher using mocked Blockfrost API responses
+- [X] T042 Create tests/unit/test_graph_builder.py with unit tests for GraphBuilder using sample Block, Transaction, Address instances
+- [X] T043 Create tests/unit/test_web_server.py with Flask test client tests for GET /, GET /api/graph, GET /api/status routes
+- [X] T044 Create tests/integration/test_end_to_end.py with integration test simulating full data flow from API fetch to graph visualization
+- [X] T045 Update README.md with complete setup instructions, configuration details, troubleshooting guide, and usage examples
 
 ---
 

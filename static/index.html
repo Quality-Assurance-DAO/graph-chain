@@ -330,6 +330,21 @@
             <span class="info-label" style="color: #f44336;">Error:</span>
             <span class="info-value" style="color: #f44336;" id="error-message">-</span>
         </div>
+        <div class="info-item">
+            <h4 style="margin: 10px 0 5px 0; color: var(--text-accent);">Analytics</h4>
+            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 11px;">Color Scheme:</label>
+            <select id="color-scheme-selector" onchange="changeColorScheme(event)" style="width: 100%; padding: 5px; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 3px; color: var(--text-primary); font-size: 11px;">
+                <option value="heatmap">Heatmap (Red→Yellow→Green)</option>
+                <option value="activity">Activity (Blue→Purple→Red)</option>
+                <option value="grayscale">Grayscale</option>
+            </select>
+            <button onclick="recalculateAnalytics()" style="width: 100%; margin-top: 5px; padding: 5px; background-color: var(--text-accent); border: none; border-radius: 3px; color: var(--bg-primary); cursor: pointer; font-size: 11px; font-weight: bold;">
+                Recalculate Analytics
+            </button>
+            <div id="analytics-loading" style="display: none; margin-top: 5px; color: var(--text-accent); font-size: 10px;">
+                <span>⏳ Calculating...</span>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -408,6 +423,14 @@
         let nodes = new vis.DataSet([]);
         let edges = new vis.DataSet([]);
         
+        // Analytics state
+        let currentColorScheme = 'heatmap';
+        let degreeMetrics = {};
+        let activityMetrics = {};
+        let isLoadingAnalytics = false;
+        let flowPaths = [];
+        let highlightedFlowPaths = new Set();
+        
         // Initialize theme on page load (after variables are declared)
         initTheme();
         
@@ -436,6 +459,29 @@
         
         function getNodeColor(node, isLightTheme = false) {
             const type = node.type || 'unknown';
+            const nodeId = node.id;
+            
+            // Use color from activity metrics API if available
+            if (activityMetrics[nodeId] && activityMetrics[nodeId].color_hex) {
+                const colorHex = activityMetrics[nodeId].color_hex;
+                const isLight = isLightColor(colorHex);
+                
+                return {
+                    background: colorHex,
+                    border: isLightTheme ? (isLight ? '#333333' : '#000000') : (isLight ? '#000000' : '#ffffff'),
+                    highlight: {
+                        background: adjustBrightness(colorHex, 1.2),
+                        border: colorHex
+                    },
+                    font: {
+                        color: isLight ? '#000000' : '#ffffff',
+                        strokeWidth: 2,
+                        strokeColor: isLight ? '#ffffff' : '#000000'
+                    }
+                };
+            }
+            
+            // Fallback to activity score if no API color available
             const activityScore = node.activity_score || 0;
             let colorObj = {};
             
@@ -477,6 +523,20 @@
             };
             
             return colorObj;
+        }
+        
+        function adjustBrightness(hex, factor) {
+            // Simple brightness adjustment
+            hex = hex.replace('#', '');
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            
+            const newR = Math.min(255, Math.max(0, Math.round(r * factor)));
+            const newG = Math.min(255, Math.max(0, Math.round(g * factor)));
+            const newB = Math.min(255, Math.max(0, Math.round(b * factor)));
+            
+            return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
         }
         
         function getNodeSize(node) {
@@ -735,9 +795,18 @@
         
         network.on('click', function(params) {
             if (params.nodes.length > 0) {
-                highlightConnectedNodes(params.nodes[0]);
+                const nodeId = params.nodes[0];
+                const node = nodes.get(nodeId);
+                
+                // If clicking a transaction, show flow paths
+                if (node && node.type === 'transaction') {
+                    showFlowPaths(nodeId);
+                }
+                
+                highlightConnectedNodes(nodeId);
             } else {
                 unhighlightNodes();
+                clearFlowPaths();
             }
         });
         
@@ -805,7 +874,12 @@
                         updateStatus('error', 'No data returned');
                         return;
                     }
-                    console.log('Graph data loaded:', { nodes: data.nodes?.length || 0, edges: data.edges?.length || 0 });
+                    console.log('Graph data loaded:', { 
+                        nodes: data.nodes?.length || 0, 
+                        edges: data.edges?.length || 0,
+                        zoomLevel: currentZoomLevel,
+                        nodeTypes: data.nodes?.map(n => n.type) || []
+                    });
                     if (data.nodes && data.edges) {
                         nodes.clear();
                         edges.clear();
@@ -818,18 +892,55 @@
                             // In block view, show only blocks and chain edges
                             nodesToAdd = data.nodes.filter(node => node.type === 'block');
                             edgesToAdd = data.edges.filter(edge => edge.type === 'chain');
+                            console.log('Block view filter:', { 
+                                blocks: nodesToAdd.length, 
+                                chainEdges: edgesToAdd.length,
+                                totalEdges: data.edges.length,
+                                edgeTypes: data.edges.map(e => e.type)
+                            });
+                        } else {
+                            // Transaction view: show all nodes and edges
+                            console.log('Transaction view:', { 
+                                nodes: nodesToAdd.length, 
+                                edges: edgesToAdd.length 
+                            });
                         }
                         
-                        nodes.add(nodesToAdd.map(node => ({
-                            id: node.id,
-                            label: node.label || node.id,
-                            type: node.type,
-                            title: JSON.stringify(node.data, null, 2),
-                            activity_score: node.activity_score || 0,
-                            height: node.height,
-                            tx_count: node.tx_count || 0,
-                            level: node.level || 0
-                        })));
+                        nodes.add(nodesToAdd.map(node => {
+                            const nodeId = node.id;
+                            const nodeType = node.type;
+                            
+                            // Build label with degree metrics
+                            let label = node.label || node.id;
+                            let tooltip = JSON.stringify(node.data, null, 2);
+                            
+                            // Add degree metrics to label/tooltip
+                            if (degreeMetrics[nodeId]) {
+                                const metrics = degreeMetrics[nodeId];
+                                if (nodeType === 'block') {
+                                    label = `${label}\n(${metrics.type_degree} txs)`;
+                                    tooltip += `\n\nDegree Metrics:\n- Transactions: ${metrics.type_degree}\n- Total Degree: ${metrics.total_degree}`;
+                                } else if (nodeType === 'transaction') {
+                                    const inputCount = metrics.in_degree || 0;
+                                    const outputCount = metrics.out_degree || 0;
+                                    label = `${label}\n(${inputCount} in, ${outputCount} out)`;
+                                    tooltip += `\n\nDegree Metrics:\n- Inputs: ${inputCount}\n- Outputs: ${outputCount}\n- Total Degree: ${metrics.total_degree}`;
+                                } else if (nodeType === 'address') {
+                                    tooltip += `\n\nDegree Metrics:\n- UTxO Count: ${metrics.type_degree}\n- Total Degree: ${metrics.total_degree}`;
+                                }
+                            }
+                            
+                            return {
+                                id: nodeId,
+                                label: label,
+                                type: nodeType,
+                                title: tooltip,
+                                activity_score: node.activity_score || 0,
+                                height: node.height,
+                                tx_count: node.tx_count || 0,
+                                level: node.level || 0
+                            };
+                        }));
                         
                         // Track visible blocks
                         nodesToAdd.forEach(node => {
@@ -843,7 +954,7 @@
                         const isLight = currentTheme === 'light';
                         const defaultEdgeColor = isLight ? '#666666' : '#848484';
                         
-                        edges.add(edgesToAdd.map(edge => {
+                        const edgesToAddFormatted = edgesToAdd.map(edge => {
                             // Enhanced edge labeling (T030 - show amounts and types)
                             let edgeLabel = edge.label || '';
                             let edgeTitle = `Type: ${edge.type}`;
@@ -878,8 +989,24 @@
                                 width: edgeWidth,
                                 color: { color: edgeColor, highlight: '#00d4ff' }
                             };
-                        }));
+                        });
+                        
+                        console.log('Adding edges:', edgesToAddFormatted.length);
+                        edges.add(edgesToAddFormatted);
+                        
+                        // Log warning if no edges in block view with multiple blocks
+                        if (currentZoomLevel === 'block' && nodesToAdd.length > 1 && edgesToAddFormatted.length === 0) {
+                            console.warn('Block view: Multiple blocks but no chain edges found. Edges may not be loaded yet.');
+                        }
+                        
+                        // Log info if single block with no edges
+                        if (currentZoomLevel === 'block' && nodesToAdd.length === 1 && edgesToAddFormatted.length === 0) {
+                            console.info('Single block loaded. Chain edges will appear when more blocks are added. Switch to Transaction View to see transactions.');
+                        }
+                        
                         updateVisibleBlocks();
+                        
+                        // Update node styles first (without analytics)
                         updateNodeStyles();
                         updateStats(data.metadata);
                         
@@ -888,6 +1015,15 @@
                         
                         // Update status to active after successful load
                         updateStatus('active', 'Active');
+                        
+                        // Load analytics data asynchronously (non-blocking)
+                        // This will update colors and labels when ready
+                        loadAnalyticsData().then(() => {
+                            // Update styles again with analytics data
+                            updateNodeStyles();
+                        }).catch(err => {
+                            console.warn('Analytics loading failed, continuing without analytics:', err);
+                        });
                         
                         // Refresh browse panel if it's open
                         if (document.getElementById('browse-panel').classList.contains('active')) {
@@ -1205,8 +1341,14 @@
                 }, 100);
             }
             
-            // Refresh stats periodically
-            loadGraph();
+            // Refresh graph after updates (but debounce to avoid too frequent reloads)
+            if (!window.graphReloadPending) {
+                window.graphReloadPending = true;
+                setTimeout(() => {
+                    loadGraph();
+                    window.graphReloadPending = false;
+                }, 1000); // Debounce: wait 1 second after last update
+            }
         }
         
         // Check system status (T038 - status display UI)
@@ -1259,6 +1401,186 @@
                     updateStatus('error', 'Status check failed');
                 });
         }
+        
+        // Analytics functions
+        function loadAnalyticsData() {
+            if (isLoadingAnalytics) {
+                return Promise.resolve();
+            }
+            isLoadingAnalytics = true;
+            showAnalyticsLoading(true);
+            
+            // Load degree metrics
+            return fetch('/api/analytics/degrees')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Analytics API error: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Store degree metrics by node_id
+                    degreeMetrics = {};
+                    if (data.metrics) {
+                        data.metrics.forEach(metric => {
+                            degreeMetrics[metric.node_id] = metric;
+                        });
+                    }
+                    
+                    // Load activity metrics with current color scheme
+                    return fetch(`/api/analytics/activity?color_scheme=${currentColorScheme}`);
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Activity API error: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Store activity metrics by node_id
+                    activityMetrics = {};
+                    if (data.metrics) {
+                        data.metrics.forEach(metric => {
+                            activityMetrics[metric.node_id] = metric;
+                        });
+                    }
+                    
+                    showAnalyticsLoading(false);
+                    isLoadingAnalytics = false;
+                })
+                .catch(error => {
+                    console.error('Error loading analytics:', error);
+                    showAnalyticsLoading(false);
+                    isLoadingAnalytics = false;
+                    // Re-throw to allow caller to handle
+                    throw error;
+                });
+        }
+        
+        function changeColorScheme(event) {
+            const scheme = event.target.value;
+            currentColorScheme = scheme;
+            
+            // Reload activity metrics with new scheme
+            fetch(`/api/analytics/activity?color_scheme=${scheme}`)
+                .then(response => response.json())
+                .then(data => {
+                    activityMetrics = {};
+                    if (data.metrics) {
+                        data.metrics.forEach(metric => {
+                            activityMetrics[metric.node_id] = metric;
+                        });
+                    }
+                    updateNodeStyles();
+                })
+                .catch(error => {
+                    console.error('Error changing color scheme:', error);
+                });
+        }
+        
+        function recalculateAnalytics() {
+            showAnalyticsLoading(true);
+            
+            fetch('/api/analytics/recalculate', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    // Wait a bit for recalculation, then reload
+                    setTimeout(() => {
+                        loadAnalyticsData();
+                    }, 500);
+                })
+                .catch(error => {
+                    console.error('Error recalculating analytics:', error);
+                    showAnalyticsLoading(false);
+                });
+        }
+        
+        function showAnalyticsLoading(show) {
+            const loadingEl = document.getElementById('analytics-loading');
+            if (loadingEl) {
+                loadingEl.style.display = show ? 'block' : 'none';
+            }
+        }
+        
+        function showFlowPaths(transactionId) {
+            fetch(`/api/analytics/flow?transaction_id=${transactionId}&max_depth=5&max_blocks=5`)
+                .then(response => response.json())
+                .then(data => {
+                    flowPaths = data.paths || [];
+                    highlightFlowPaths();
+                })
+                .catch(error => {
+                    console.error('Error loading flow paths:', error);
+                });
+        }
+        
+        function highlightFlowPaths() {
+            // Clear previous highlights
+            clearFlowPaths();
+            
+            // Highlight edges in flow paths
+            flowPaths.forEach(path => {
+                path.path_edges.forEach(edge => {
+                    const edgeId = edge.from + '-' + edge.to;
+                    const visEdge = edges.get(edgeId);
+                    
+                    if (visEdge) {
+                        highlightedFlowPaths.add(edgeId);
+                        edges.update({
+                            id: edgeId,
+                            color: { color: '#00ff00', highlight: '#00ff00' },
+                            width: 4,
+                            dashes: false
+                        });
+                    }
+                });
+                
+                // Highlight nodes in path
+                path.path_nodes.forEach(nodeId => {
+                    const node = nodes.get(nodeId);
+                    if (node) {
+                        nodes.update({
+                            id: nodeId,
+                            size: (node.size || 20) * 1.3
+                        });
+                    }
+                });
+            });
+        }
+        
+        function clearFlowPaths() {
+            // Restore edge styles
+            highlightedFlowPaths.forEach(edgeId => {
+                const edge = edges.get(edgeId);
+                if (edge) {
+                    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+                    const isLight = currentTheme === 'light';
+                    const defaultEdgeColor = isLight ? '#666666' : '#848484';
+                    
+                    edges.update({
+                        id: edgeId,
+                        color: { color: defaultEdgeColor, highlight: '#00d4ff' },
+                        width: edge.type === 'chain' ? 4 : 2
+                    });
+                }
+            });
+            highlightedFlowPaths.clear();
+            
+            // Restore node sizes
+            nodes.forEach(node => {
+                const size = getNodeSize(node);
+                nodes.update({
+                    id: node.id,
+                    size: size
+                });
+            });
+            
+            flowPaths = [];
+        }
+        
+        // Make functions globally accessible
+        window.changeColorScheme = changeColorScheme;
+        window.recalculateAnalytics = recalculateAnalytics;
         
         // Initialize - wait for DOM to be ready
         if (document.readyState === 'loading') {

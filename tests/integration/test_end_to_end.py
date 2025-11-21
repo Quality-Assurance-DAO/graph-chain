@@ -206,6 +206,45 @@ def test_integration_analytics_degrees_endpoint(sample_graph_data, analytics_eng
         assert specific_metrics[0]['node_id'] == node_id
 
 
+def test_integration_analytics_degrees_endpoint_http(sample_graph_data):
+    """Test GET /api/analytics/degrees HTTP endpoint."""
+    from src.web_server import app
+    
+    app.config['TESTING'] = True
+    with app.test_client() as client:
+        # Test basic endpoint
+        response = client.get('/api/analytics/degrees')
+        assert response.status_code == 200
+        
+        data = response.get_json()
+        assert 'metrics' in data
+        assert 'statistics' in data
+        
+        metrics = data['metrics']
+        assert len(metrics) > 0
+        assert all('node_id' in m for m in metrics)
+        assert all('node_type' in m for m in metrics)
+        assert all('in_degree' in m for m in metrics)
+        assert all('out_degree' in m for m in metrics)
+        assert all('total_degree' in m for m in metrics)
+        assert all('type_degree' in m for m in metrics)
+        
+        # Test filtering by node_type
+        response = client.get('/api/analytics/degrees?node_type=block')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert all(m['node_type'] == 'block' for m in data['metrics'])
+        
+        # Test filtering by node_id
+        if metrics:
+            node_id = metrics[0]['node_id']
+            response = client.get(f'/api/analytics/degrees?node_id={node_id}')
+            assert response.status_code == 200
+            data = response.get_json()
+            assert len(data['metrics']) == 1
+            assert data['metrics'][0]['node_id'] == node_id
+
+
 def test_integration_analytics_activity_endpoint(sample_graph_data, analytics_engine):
     """Test GET /api/analytics/activity endpoint integration."""
     # Get activity metrics with different color schemes

@@ -94,6 +94,7 @@
             background-color: #f44336;
             color: white;
         }
+        /* Status colors remain fixed for visibility in both themes */
         #graph-container {
             width: 100%;
             height: calc(100vh - 80px);
@@ -270,7 +271,7 @@
             <button class="filter-btn" onclick="filterNodes('transaction', event)">Txs</button>
             <button class="filter-btn" onclick="filterNodes('address', event)">Addresses</button>
         </div>
-        <div id="node-count-display" style="margin-bottom: 10px; color: #aaaaaa; font-size: 11px;">
+        <div id="node-count-display" style="margin-bottom: 10px; color: var(--text-secondary); font-size: 11px;">
             Showing 0 / 0 nodes (Max: 30)
         </div>
         <div id="node-list" class="node-list"></div>
@@ -456,7 +457,7 @@
             },
             edges: {
                 width: 2,
-                color: { color: '#848484' },
+                color: { color: 'var(--text-secondary)' },
                 smooth: {
                     type: 'continuous',
                     roundness: 0.5
@@ -466,11 +467,11 @@
                 },
                 font: {
                     size: 11,
-                    color: '#ffffff',
+                    color: 'var(--text-primary)',
                     align: 'middle',
-                    background: 'rgba(0,0,0,0.7)',
+                    background: 'var(--bg-panel)',
                     strokeWidth: 2,
-                    strokeColor: '#000000'
+                    strokeColor: 'var(--bg-primary)'
                 },
                 labelHighlightBold: true,
                 chosen: {
@@ -691,8 +692,19 @@
             const url = maxBlocks ? `/api/graph?max_blocks=${maxBlocks}` : '/api/graph';
             
             fetch(url)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
+                    if (!data) {
+                        console.error('No data returned from API');
+                        updateStatus('error', 'No data returned');
+                        return;
+                    }
+                    console.log('Graph data loaded:', { nodes: data.nodes?.length || 0, edges: data.edges?.length || 0 });
                     if (data.nodes && data.edges) {
                         nodes.clear();
                         edges.clear();
@@ -725,17 +737,22 @@
                             }
                         });
                         
+                        // Get current theme for edge colors
+                        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+                        const isLight = currentTheme === 'light';
+                        const defaultEdgeColor = isLight ? '#666666' : '#848484';
+                        
                         edges.add(edgesToAdd.map(edge => {
                             // Enhanced edge labeling (T030 - show amounts and types)
                             let edgeLabel = edge.label || '';
                             let edgeTitle = `Type: ${edge.type}`;
                             let edgeWidth = 2;
-                            let edgeColor = '#848484';
+                            let edgeColor = defaultEdgeColor;
                             
                             if (edge.type === 'chain') {
                                 // Chain edges (block to block) are thicker and more prominent
                                 edgeWidth = 4;
-                                edgeColor = '#00d4ff';
+                                edgeColor = '#00d4ff'; // Keep accent color for chain edges
                                 edgeLabel = '';
                                 edgeTitle = 'Block Chain';
                             } else if (edge.type === 'tx_output' && edge.weight) {
@@ -765,6 +782,13 @@
                         updateNodeStyles();
                         updateStats(data.metadata);
                         
+                        // Update graph theme after loading
+                        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+                        updateGraphTheme(currentTheme);
+                        
+                        // Update status to active after successful load
+                        updateStatus('active', 'Active');
+                        
                         // Refresh browse panel if it's open
                         if (document.getElementById('browse-panel').classList.contains('active')) {
                             loadBrowseNodes();
@@ -781,11 +805,14 @@
                                 });
                             }, 500);
                         }
+                    } else {
+                        console.error('Invalid graph data structure. Expected nodes and edges:', data);
+                        updateStatus('error', 'Invalid data structure');
                     }
                 })
                 .catch(error => {
                     console.error('Error loading graph:', error);
-                    updateStatus('error', 'Error loading graph');
+                    updateStatus('error', 'Error loading graph: ' + error.message);
                 });
         }
         
@@ -859,6 +886,7 @@
                 .catch(error => {
                     console.error('Error loading nodes:', error);
                     document.getElementById('node-list').innerHTML = '<div style="color: #f44336;">Error loading nodes</div>';
+                    // Error color stays red for visibility
                 });
         }
         
@@ -869,7 +897,7 @@
             countDisplay.textContent = `Showing ${nodeList.length} / ${total} nodes (Max: 30)`;
             
             if (nodeList.length === 0) {
-                container.innerHTML = '<div style="color: #aaaaaa; padding: 20px; text-align: center;">No nodes found</div>';
+                container.innerHTML = '<div style="color: var(--text-secondary); padding: 20px; text-align: center;">No nodes found</div>';
                 return;
             }
             
@@ -1034,9 +1062,17 @@
         // Check system status (T038 - status display UI)
         function checkStatus() {
             fetch('/api/status')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    updateStatus(data.status || 'active', data.status || 'Active');
+                    // Update status with proper capitalization
+                    const status = data.status || 'active';
+                    const statusMessage = status.charAt(0).toUpperCase() + status.slice(1);
+                    updateStatus(status, statusMessage);
                     
                     // Update API status
                     document.getElementById('api-status').textContent = data.api_status || '-';
@@ -1074,11 +1110,21 @@
                 });
         }
         
-        // Initialize
-        loadGraph();
-        connectSSE();
-        checkStatus();
-        setInterval(checkStatus, 10000); // Check status every 10 seconds
+        // Initialize - wait for DOM to be ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                loadGraph();
+                connectSSE();
+                checkStatus();
+                setInterval(checkStatus, 10000); // Check status every 10 seconds
+            });
+        } else {
+            // DOM is already ready
+            loadGraph();
+            connectSSE();
+            checkStatus();
+            setInterval(checkStatus, 10000); // Check status every 10 seconds
+        }
     </script>
 </body>
 </html>

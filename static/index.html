@@ -59,6 +59,105 @@
             max-height: calc(100vh - 100px);
             overflow-y: auto;
         }
+        #browse-panel {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            width: 350px;
+            background-color: rgba(45, 45, 45, 0.9);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-height: calc(100vh - 100px);
+            display: none;
+        }
+        #browse-panel.active {
+            display: block;
+        }
+        #browse-panel h3 {
+            margin-top: 0;
+            color: #00d4ff;
+        }
+        .search-box {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            background-color: #1a1a1a;
+            border: 1px solid #3d3d3d;
+            border-radius: 3px;
+            color: #ffffff;
+            font-size: 12px;
+        }
+        .filter-buttons {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        .filter-btn {
+            flex: 1;
+            padding: 5px;
+            background-color: #2d2d2d;
+            border: 1px solid #3d3d3d;
+            border-radius: 3px;
+            color: #ffffff;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .filter-btn.active {
+            background-color: #00d4ff;
+            color: #1a1a1a;
+        }
+        .node-list {
+            max-height: calc(100vh - 250px);
+            overflow-y: auto;
+        }
+        .node-item {
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #2d2d2d;
+            border-left: 3px solid #00d4ff;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .node-item:hover {
+            background-color: #3d3d3d;
+        }
+        .node-item.block {
+            border-left-color: #00d4ff;
+        }
+        .node-item.transaction {
+            border-left-color: #ff6b6b;
+        }
+        .node-item.address {
+            border-left-color: #4ecdc4;
+        }
+        .node-label {
+            font-weight: bold;
+            color: #ffffff;
+            font-size: 12px;
+        }
+        .node-details {
+            font-size: 10px;
+            color: #aaaaaa;
+            margin-top: 3px;
+        }
+        .toggle-browse {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            padding: 10px 15px;
+            background-color: rgba(45, 45, 45, 0.9);
+            border: 1px solid #3d3d3d;
+            border-radius: 5px;
+            color: #00d4ff;
+            cursor: pointer;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        .toggle-browse:hover {
+            background-color: rgba(45, 45, 45, 1);
+        }
         #info-panel h3 {
             margin-top: 0;
             color: #00d4ff;
@@ -82,12 +181,27 @@
         <h1>Cardano Blockchain Graph Visualization</h1>
         <span id="status" class="status-active">Loading...</span>
     </div>
+    <button class="toggle-browse" onclick="toggleBrowsePanel()">📋 Browse Nodes</button>
+    <div id="browse-panel">
+        <h3>Browse Captured Data</h3>
+        <input type="text" id="search-input" class="search-box" placeholder="Search nodes..." oninput="searchNodes()">
+        <div class="filter-buttons">
+            <button class="filter-btn active" onclick="filterNodes('')">All</button>
+            <button class="filter-btn" onclick="filterNodes('block')">Blocks</button>
+            <button class="filter-btn" onclick="filterNodes('transaction')">Txs</button>
+            <button class="filter-btn" onclick="filterNodes('address')">Addresses</button>
+        </div>
+        <div id="node-count-display" style="margin-bottom: 10px; color: #aaaaaa; font-size: 11px;">
+            Showing 0 / 0 nodes (Max: 30)
+        </div>
+        <div id="node-list" class="node-list"></div>
+    </div>
     <div id="graph-container"></div>
     <div id="info-panel">
         <h3>Graph Statistics</h3>
         <div class="info-item">
             <span class="info-label">Nodes:</span>
-            <span class="info-value" id="node-count">0</span>
+            <span class="info-value" id="node-count">0</span> / 30 (max)
         </div>
         <div class="info-item">
             <span class="info-label">Edges:</span>
@@ -330,6 +444,11 @@
                         }));
                         updateNodeStyles();
                         updateStats(data.metadata);
+                        
+                        // Refresh browse panel if it's open
+                        if (document.getElementById('browse-panel').classList.contains('active')) {
+                            loadBrowseNodes();
+                        }
                     }
                 })
                 .catch(error => {
@@ -349,6 +468,97 @@
             }
         }
         
+        // Browse panel functionality
+        let currentFilter = '';
+        let currentSearch = '';
+        
+        function toggleBrowsePanel() {
+            const panel = document.getElementById('browse-panel');
+            panel.classList.toggle('active');
+            if (panel.classList.contains('active')) {
+                loadBrowseNodes();
+            }
+        }
+        
+        function filterNodes(type) {
+            currentFilter = type;
+            // Update button states
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            loadBrowseNodes();
+        }
+        
+        function searchNodes() {
+            currentSearch = document.getElementById('search-input').value;
+            loadBrowseNodes();
+        }
+        
+        function loadBrowseNodes() {
+            const params = new URLSearchParams();
+            if (currentSearch) params.append('q', currentSearch);
+            if (currentFilter) params.append('type', currentFilter);
+            params.append('limit', 100);
+            
+            fetch('/api/nodes?' + params.toString())
+                .then(response => response.json())
+                .then(data => {
+                    displayBrowseNodes(data.nodes, data.total);
+                })
+                .catch(error => {
+                    console.error('Error loading nodes:', error);
+                    document.getElementById('node-list').innerHTML = '<div style="color: #f44336;">Error loading nodes</div>';
+                });
+        }
+        
+        function displayBrowseNodes(nodeList, total) {
+            const container = document.getElementById('node-list');
+            const countDisplay = document.getElementById('node-count-display');
+            
+            countDisplay.textContent = `Showing ${nodeList.length} / ${total} nodes (Max: 30)`;
+            
+            if (nodeList.length === 0) {
+                container.innerHTML = '<div style="color: #aaaaaa; padding: 20px; text-align: center;">No nodes found</div>';
+                return;
+            }
+            
+            container.innerHTML = nodeList.map(node => {
+                const type = node.type || 'unknown';
+                const label = node.label || node.id;
+                const data = node.data || {};
+                
+                let details = '';
+                if (type === 'block') {
+                    details = `Height: ${data.block_height || 'N/A'} | Hash: ${(data.block_hash || '').substring(0, 16)}...`;
+                } else if (type === 'transaction') {
+                    details = `Hash: ${(data.tx_hash || '').substring(0, 16)}... | Block: ${data.block_height || 'N/A'}`;
+                } else if (type === 'address') {
+                    details = `Address: ${(data.address || '').substring(0, 20)}... | Tx Count: ${data.transaction_count || 0}`;
+                }
+                
+                return `
+                    <div class="node-item ${type}" onclick="focusNode('${node.id}')">
+                        <div class="node-label">${label}</div>
+                        <div class="node-details">${details}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function focusNode(nodeId) {
+            // Focus on the node in the graph
+            if (network) {
+                network.focus(nodeId, {
+                    animation: {
+                        duration: 500,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+                highlightConnectedNodes(nodeId);
+            }
+        }
+        
         // Update status indicator
         function updateStatus(status, message) {
             const statusEl = document.getElementById('status');
@@ -364,6 +574,10 @@
                 try {
                     const update = JSON.parse(event.data);
                     handleGraphUpdate(update);
+                    // Refresh browse panel if it's open
+                    if (document.getElementById('browse-panel').classList.contains('active')) {
+                        loadBrowseNodes();
+                    }
                 } catch (error) {
                     console.error('Error parsing SSE update:', error);
                 }

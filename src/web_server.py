@@ -134,6 +134,96 @@ def get_status():
         return jsonify({'error': str(e), 'status': 'error'}), 500
 
 
+@app.route('/api/nodes')
+def browse_nodes():
+    """Browse and search nodes in the graph."""
+    try:
+        search_query = request.args.get('q', '').lower()
+        node_type = request.args.get('type', '')  # 'block', 'transaction', 'address', or '' for all
+        limit = int(request.args.get('limit', 100))
+        offset = int(request.args.get('offset', 0))
+        
+        graph_data = graph_builder.to_json()
+        all_nodes = graph_data.get('nodes', [])
+        
+        # Filter nodes
+        filtered_nodes = []
+        for node in all_nodes:
+            # Type filter
+            if node_type and node.get('type') != node_type:
+                continue
+            
+            # Search filter
+            if search_query:
+                node_data = node.get('data', {})
+                label = node.get('label', '').lower()
+                node_id = node.get('id', '').lower()
+                
+                # Search in label, id, and data fields
+                matches = (
+                    search_query in label or
+                    search_query in node_id or
+                    search_query in str(node_data.get('block_hash', '')).lower() or
+                    search_query in str(node_data.get('tx_hash', '')).lower() or
+                    search_query in str(node_data.get('address', '')).lower() or
+                    search_query in str(node_data.get('block_height', '')).lower()
+                )
+                if not matches:
+                    continue
+            
+            filtered_nodes.append(node)
+        
+        # Apply pagination
+        total = len(filtered_nodes)
+        paginated_nodes = filtered_nodes[offset:offset + limit]
+        
+        return jsonify({
+            'nodes': paginated_nodes,
+            'total': total,
+            'limit': limit,
+            'offset': offset,
+            'has_more': offset + limit < total
+        })
+    except Exception as e:
+        logger.error(f"Error browsing nodes: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/nodes/<node_id>')
+def get_node(node_id):
+    """Get detailed information about a specific node."""
+    try:
+        graph_data = graph_builder.to_json()
+        nodes = graph_data.get('nodes', [])
+        
+        # Find the node
+        node = next((n for n in nodes if n.get('id') == node_id), None)
+        if not node:
+            return jsonify({'error': 'Node not found'}), 404
+        
+        # Get connected nodes and edges
+        edges = graph_data.get('edges', [])
+        connected_edges = [e for e in edges if e.get('from') == node_id or e.get('to') == node_id]
+        connected_node_ids = set()
+        for edge in connected_edges:
+            if edge.get('from') == node_id:
+                connected_node_ids.add(edge.get('to'))
+            if edge.get('to') == node_id:
+                connected_node_ids.add(edge.get('from'))
+        
+        connected_nodes = [n for n in nodes if n.get('id') in connected_node_ids]
+        
+        return jsonify({
+            'node': node,
+            'connected_nodes': connected_nodes,
+            'connected_edges': connected_edges,
+            'connection_count': len(connected_node_ids)
+        })
+    except Exception as e:
+        logger.error(f"Error getting node: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 errors gracefully."""

@@ -24,10 +24,17 @@ class GraphBuilder:
         Args:
             block: Block instance to add
         """
+        # Check if we've reached the node limit
+        if len(self.graph.nodes()) >= MAX_NODES:
+            return  # Don't add more nodes if limit reached
+        
         node_id = f"block_{block.block_hash}"
         
         # Add block node if not already present
         if not self.graph.has_node(node_id):
+            # Double-check limit before adding
+            if len(self.graph.nodes()) >= MAX_NODES:
+                return
             self.graph.add_node(
                 node_id,
                 type='block',
@@ -45,10 +52,17 @@ class GraphBuilder:
         Args:
             transaction: Transaction instance to add
         """
+        # Check if we've reached the node limit
+        if len(self.graph.nodes()) >= MAX_NODES:
+            return  # Don't add more nodes if limit reached
+        
         tx_id = f"tx_{transaction.tx_hash}"
         
         # Add transaction node if not already present
         if not self.graph.has_node(tx_id):
+            # Double-check limit before adding
+            if len(self.graph.nodes()) >= MAX_NODES:
+                return
             self.graph.add_node(
                 tx_id,
                 type='transaction',
@@ -134,6 +148,9 @@ class GraphBuilder:
         
         # Add or update address node with aggregation
         if not self.graph.has_node(addr_id):
+            # Check if we've reached the node limit
+            if len(self.graph.nodes()) >= MAX_NODES:
+                return  # Don't add more nodes if limit reached
             # New address - add node
             self.graph.add_node(
                 addr_id,

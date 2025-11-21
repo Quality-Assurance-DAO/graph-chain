@@ -186,10 +186,10 @@
         <h3>Browse Captured Data</h3>
         <input type="text" id="search-input" class="search-box" placeholder="Search nodes..." oninput="searchNodes()">
         <div class="filter-buttons">
-            <button class="filter-btn active" onclick="filterNodes('')">All</button>
-            <button class="filter-btn" onclick="filterNodes('block')">Blocks</button>
-            <button class="filter-btn" onclick="filterNodes('transaction')">Txs</button>
-            <button class="filter-btn" onclick="filterNodes('address')">Addresses</button>
+            <button class="filter-btn active" onclick="filterNodes('', event)">All</button>
+            <button class="filter-btn" onclick="filterNodes('block', event)">Blocks</button>
+            <button class="filter-btn" onclick="filterNodes('transaction', event)">Txs</button>
+            <button class="filter-btn" onclick="filterNodes('address', event)">Addresses</button>
         </div>
         <div id="node-count-display" style="margin-bottom: 10px; color: #aaaaaa; font-size: 11px;">
             Showing 0 / 0 nodes (Max: 30)
@@ -216,7 +216,7 @@
             <span class="info-value" id="zoom-level">Block View</span>
         </div>
         <div class="info-item">
-            <button onclick="toggleZoomLevel()" style="width: 100%; padding: 5px; background-color: #00d4ff; border: none; border-radius: 3px; color: #1a1a1a; cursor: pointer; font-weight: bold;">
+            <button id="zoom-toggle-btn" onclick="toggleZoomLevel(event)" style="width: 100%; padding: 5px; background-color: #00d4ff; border: none; border-radius: 3px; color: #1a1a1a; cursor: pointer; font-weight: bold;">
                 Switch to Transaction View
             </button>
         </div>
@@ -417,26 +417,34 @@
             return null;
         }
         
-        function toggleZoomLevel() {
+        function toggleZoomLevel(event) {
             currentZoomLevel = currentZoomLevel === 'block' ? 'transaction' : 'block';
             document.getElementById('zoom-level').textContent = 
                 currentZoomLevel === 'block' ? 'Block View' : 'Transaction View';
             
-            const button = event.target;
-            button.textContent = currentZoomLevel === 'block' 
-                ? 'Switch to Transaction View' 
-                : 'Switch to Block View';
+            // Update button text
+            const button = event && event.target ? event.target : document.getElementById('zoom-toggle-btn');
+            if (button) {
+                button.textContent = currentZoomLevel === 'block' 
+                    ? 'Switch to Transaction View' 
+                    : 'Switch to Block View';
+            }
             
-            // Update visibility
-            updateNodeStyles();
+            // Reload graph with appropriate view
+            loadGraph();
             
-            // Smooth transition
-            network.fit({
-                animation: {
-                    duration: 500,
-                    easingFunction: 'easeInOutQuad'
+            // Update visibility after a short delay to ensure nodes are loaded
+            setTimeout(() => {
+                updateNodeStyles();
+                if (network) {
+                    network.fit({
+                        animation: {
+                            duration: 500,
+                            easingFunction: 'easeInOutQuad'
+                        }
+                    });
                 }
-            });
+            }, 100);
         }
         
         // Handle zoom events for dynamic expansion
@@ -532,13 +540,27 @@
         
         // Load initial graph state
         function loadGraph() {
-            fetch('/api/graph')
+            const maxBlocks = currentZoomLevel === 'block' ? MAX_VISIBLE_BLOCKS : null;
+            const url = maxBlocks ? `/api/graph?max_blocks=${maxBlocks}` : '/api/graph';
+            
+            fetch(url)
                 .then(response => response.json())
                 .then(data => {
                     if (data.nodes && data.edges) {
                         nodes.clear();
                         edges.clear();
-                        nodes.add(data.nodes.map(node => ({
+                        
+                        // Filter nodes and edges based on zoom level
+                        let nodesToAdd = data.nodes;
+                        let edgesToAdd = data.edges;
+                        
+                        if (currentZoomLevel === 'block') {
+                            // In block view, show only blocks and chain edges
+                            nodesToAdd = data.nodes.filter(node => node.type === 'block');
+                            edgesToAdd = data.edges.filter(edge => edge.type === 'chain');
+                        }
+                        
+                        nodes.add(nodesToAdd.map(node => ({
                             id: node.id,
                             label: node.label || node.id,
                             type: node.type,
@@ -550,12 +572,13 @@
                         })));
                         
                         // Track visible blocks
-                        data.nodes.forEach(node => {
+                        nodesToAdd.forEach(node => {
                             if (node.type === 'block') {
                                 visibleBlocks.add(node.id);
                             }
                         });
-                        edges.add(data.edges.map(edge => {
+                        
+                        edges.add(edgesToAdd.map(edge => {
                             // Enhanced edge labeling (T030 - show amounts and types)
                             let edgeLabel = edge.label || '';
                             let edgeTitle = `Type: ${edge.type}`;
@@ -642,13 +665,31 @@
             }
         }
         
-        function filterNodes(type) {
+        function filterNodes(type, event) {
             currentFilter = type;
-            // Update button states
+            
+            // Update button states - remove active from all
             document.querySelectorAll('.filter-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            event.target.classList.add('active');
+            
+            // Add active to the clicked button
+            if (event && event.target) {
+                event.target.classList.add('active');
+            } else {
+                // Fallback: find button by matching the type
+                const buttons = document.querySelectorAll('.filter-btn');
+                buttons.forEach(btn => {
+                    const btnText = btn.textContent.trim().toLowerCase();
+                    if ((type === '' && btnText === 'all') ||
+                        (type === 'block' && btnText === 'blocks') ||
+                        (type === 'transaction' && btnText === 'txs') ||
+                        (type === 'address' && btnText === 'addresses')) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
+            
             loadBrowseNodes();
         }
         

@@ -116,6 +116,48 @@
             box-shadow: 0 2px 10px var(--shadow-color);
             transition: background-color 0.3s ease, border-color 0.3s ease;
         }
+        #flow-path-notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--bg-panel);
+            padding: 12px 20px;
+            border-radius: 5px;
+            border: 2px solid var(--text-accent);
+            box-shadow: 0 4px 12px var(--shadow-color);
+            font-size: 12px;
+            color: var(--text-primary);
+            z-index: 2000;
+            max-width: 500px;
+            display: none;
+            transition: all 0.3s ease;
+        }
+        #flow-path-notification.show {
+            display: block;
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+        .flow-path-close {
+            float: right;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0;
+            margin-left: 10px;
+            line-height: 1;
+        }
         #browse-panel {
             position: absolute;
             top: 80px;
@@ -291,6 +333,16 @@
         <div id="node-list" class="node-list"></div>
     </div>
     <div id="graph-container"></div>
+    <div id="flow-path-notification">
+        <strong style="color: var(--text-accent);">🔍 Flow Path Visualization</strong>
+        <button class="flow-path-close" onclick="hideFlowPathNotification()" title="Close">×</button>
+        <div style="margin-top: 5px; line-height: 1.5;">
+            <div>Green highlighted edges show value flow paths from input addresses through this transaction to output addresses.</div>
+            <div style="margin-top: 5px; font-size: 10px; color: var(--text-secondary);">
+                Click anywhere else to clear the visualization.
+            </div>
+        </div>
+    </div>
     <div id="info-panel">
         <h3>Graph Statistics</h3>
         <div class="info-item">
@@ -331,14 +383,50 @@
             <span class="info-value" style="color: #f44336;" id="error-message">-</span>
         </div>
         <div class="info-item">
-            <h4 style="margin: 10px 0 5px 0; color: var(--text-accent);">Analytics</h4>
-            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 11px;">Color Scheme:</label>
-            <select id="color-scheme-selector" onchange="changeColorScheme(event)" style="width: 100%; padding: 5px; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 3px; color: var(--text-primary); font-size: 11px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <h4 style="margin: 0; color: var(--text-accent);">Analytics</h4>
+                <button id="analytics-help-toggle" onclick="toggleAnalyticsHelp()" style="background: none; border: none; color: var(--text-accent); cursor: pointer; font-size: 14px; padding: 0; width: 20px; height: 20px;" title="Show/Hide Help">?</button>
+            </div>
+            
+            <div id="analytics-help" style="display: none; margin-bottom: 10px; padding: 8px; background-color: var(--bg-secondary); border-radius: 3px; font-size: 10px; color: var(--text-secondary); line-height: 1.4;">
+                <div style="margin-bottom: 8px;">
+                    <strong style="color: var(--text-accent);">Color Schemes:</strong>
+                    <ul style="margin: 5px 0 0 15px; padding: 0;">
+                        <li><strong>Heatmap:</strong> Red (low) → Yellow (medium) → Green (high activity)</li>
+                        <li><strong>Activity:</strong> Blue (low) → Purple (medium) → Red (high activity)</li>
+                        <li><strong>Grayscale:</strong> Black (low) → Gray → White (high activity)</li>
+                    </ul>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <strong style="color: var(--text-accent);">Metrics:</strong>
+                    <ul style="margin: 5px 0 0 15px; padding: 0;">
+                        <li><strong>Blocks:</strong> Color shows transaction count</li>
+                        <li><strong>Transactions:</strong> Color shows input/output count</li>
+                        <li><strong>Addresses:</strong> Color shows UTxO count</li>
+                    </ul>
+                </div>
+                <div>
+                    <strong style="color: var(--text-accent);">Tips:</strong>
+                    <ul style="margin: 5px 0 0 15px; padding: 0;">
+                        <li>Click transactions to see flow paths</li>
+                        <li>Node labels show degree metrics</li>
+                        <li>Recalculate after loading new data</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 11px;">
+                Color Scheme:
+                <span id="color-scheme-help" style="margin-left: 5px; color: var(--text-accent); cursor: help; font-size: 10px;" title="Heatmap: Red→Yellow→Green shows activity levels. Blocks colored by transaction count, transactions by input/output count, addresses by UTxO count.">ℹ️</span>
+            </label>
+            <select id="color-scheme-selector" onchange="changeColorScheme(event)" onfocus="showColorSchemeHelp()" onblur="hideColorSchemeHelp()" style="width: 100%; padding: 5px; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 3px; color: var(--text-primary); font-size: 11px;">
                 <option value="heatmap">Heatmap (Red→Yellow→Green)</option>
                 <option value="activity">Activity (Blue→Purple→Red)</option>
                 <option value="grayscale">Grayscale</option>
             </select>
-            <button onclick="recalculateAnalytics()" style="width: 100%; margin-top: 5px; padding: 5px; background-color: var(--text-accent); border: none; border-radius: 3px; color: var(--bg-primary); cursor: pointer; font-size: 11px; font-weight: bold;">
+            <div id="color-scheme-description" style="display: none; margin-top: 3px; padding: 5px; background-color: var(--bg-secondary); border-radius: 3px; font-size: 9px; color: var(--text-secondary); line-height: 1.3;"></div>
+            
+            <button onclick="recalculateAnalytics()" style="width: 100%; margin-top: 5px; padding: 5px; background-color: var(--text-accent); border: none; border-radius: 3px; color: var(--bg-primary); cursor: pointer; font-size: 11px; font-weight: bold;" title="Force recalculation of all analytics metrics. Use after loading new data.">
                 Recalculate Analytics
             </button>
             <div id="analytics-loading" style="display: none; margin-top: 5px; color: var(--text-accent); font-size: 10px;">
@@ -645,6 +733,9 @@
                     if (blockId && !visibleBlocks.has(blockId)) {
                         hidden = true;
                     }
+                } else if (currentZoomLevel === 'transaction') {
+                    // In transaction view, show all nodes
+                    hidden = false;
                 }
                 
                 // Use font color from color object if available, otherwise use theme-based color
@@ -861,7 +952,7 @@
             const maxBlocks = currentZoomLevel === 'block' ? MAX_VISIBLE_BLOCKS : null;
             const url = maxBlocks ? `/api/graph?max_blocks=${maxBlocks}` : '/api/graph';
             
-            fetch(url)
+            return fetch(url)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
@@ -919,15 +1010,40 @@
                                 const metrics = degreeMetrics[nodeId];
                                 if (nodeType === 'block') {
                                     label = `${label}\n(${metrics.type_degree} txs)`;
-                                    tooltip += `\n\nDegree Metrics:\n- Transactions: ${metrics.type_degree}\n- Total Degree: ${metrics.total_degree}`;
+                                    tooltip += `\n\n📊 Analytics Metrics:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                        `Transaction Count: ${metrics.type_degree}\n` +
+                                        `  → Number of transactions in this block\n` +
+                                        `Total Connections: ${metrics.total_degree}\n` +
+                                        `  → Total edges connected to this block`;
                                 } else if (nodeType === 'transaction') {
                                     const inputCount = metrics.in_degree || 0;
                                     const outputCount = metrics.out_degree || 0;
                                     label = `${label}\n(${inputCount} in, ${outputCount} out)`;
-                                    tooltip += `\n\nDegree Metrics:\n- Inputs: ${inputCount}\n- Outputs: ${outputCount}\n- Total Degree: ${metrics.total_degree}`;
+                                    tooltip += `\n\n📊 Analytics Metrics:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                        `Input Count: ${inputCount}\n` +
+                                        `  → Number of input addresses\n` +
+                                        `Output Count: ${outputCount}\n` +
+                                        `  → Number of output addresses\n` +
+                                        `Total Connections: ${metrics.total_degree}\n` +
+                                        `  → Total edges (inputs + outputs)`;
                                 } else if (nodeType === 'address') {
-                                    tooltip += `\n\nDegree Metrics:\n- UTxO Count: ${metrics.type_degree}\n- Total Degree: ${metrics.total_degree}`;
+                                    tooltip += `\n\n📊 Analytics Metrics:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                        `UTxO Count: ${metrics.type_degree}\n` +
+                                        `  → Number of unspent transaction outputs\n` +
+                                        `Total Connections: ${metrics.total_degree}\n` +
+                                        `  → Total edges connected to this address`;
                                 }
+                            }
+                            
+                            // Add activity explanation if available
+                            if (activityMetrics[nodeId]) {
+                                const activity = activityMetrics[nodeId];
+                                tooltip += `\n\n🎨 Activity Level:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                    `Activity Score: ${activity.normalized_value.toFixed(1)}/100\n` +
+                                    `  → Normalized activity level (0=low, 100=high)\n` +
+                                    `Raw Value: ${activity.raw_value}\n` +
+                                    `Color: ${activity.color_hex}\n` +
+                                    `  → Node color reflects activity level`;
                             }
                             
                             return {
@@ -935,10 +1051,10 @@
                                 label: label,
                                 type: nodeType,
                                 title: tooltip,
-                                activity_score: node.activity_score || 0,
-                                height: node.height,
-                                tx_count: node.tx_count || 0,
-                                level: node.level || 0
+                            activity_score: node.activity_score || 0,
+                            height: node.height,
+                            tx_count: node.tx_count || 0,
+                            level: node.level || 0
                             };
                         }));
                         
@@ -970,6 +1086,10 @@
                             } else if (edge.type === 'tx_output' && edge.weight) {
                                 edgeTitle += `\nAmount: ${edge.label || edge.weight}`;
                                 edgeWidth = 2;
+                                // Show amount in label for transaction view
+                                if (currentZoomLevel === 'transaction') {
+                                    edgeLabel = edge.label || `${edge.weight} lovelace`;
+                                }
                             } else if (edge.type === 'tx_input') {
                                 edgeTitle += '\nInput connection';
                                 edgeWidth = 1.5;
@@ -987,7 +1107,9 @@
                                 type: edge.type,
                                 weight: edge.weight || 1,
                                 width: edgeWidth,
-                                color: { color: edgeColor, highlight: '#00d4ff' }
+                                color: { color: edgeColor, highlight: '#00d4ff' },
+                                hidden: false,  // Ensure edges are visible
+                                opacity: 1
                             };
                         });
                         
@@ -1025,6 +1147,9 @@
                             console.warn('Analytics loading failed, continuing without analytics:', err);
                         });
                         
+                        // Return promise for chaining
+                        return Promise.resolve();
+                        
                         // Refresh browse panel if it's open
                         if (document.getElementById('browse-panel').classList.contains('active')) {
                             loadBrowseNodes();
@@ -1045,10 +1170,12 @@
                         console.error('Invalid graph data structure. Expected nodes and edges:', data);
                         updateStatus('error', 'Invalid data structure');
                     }
+                    return data;
                 })
                 .catch(error => {
                     console.error('Error loading graph:', error);
                     updateStatus('error', 'Error loading graph: ' + error.message);
+                    throw error;
                 });
         }
         
@@ -1171,15 +1298,115 @@
         }
         
         function focusNode(nodeId) {
-            // Focus on the node in the graph
+            // Check if node exists in current view
+            const node = nodes.get(nodeId);
+            
+            // If node doesn't exist, we might need to switch views or reload
+            if (!node) {
+                // Check what type of node this is
+                // Try to get node info from the API to determine type
+                fetch(`/api/nodes/${nodeId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.node) {
+                            const nodeType = data.node.type;
+                            
+                            // If it's a transaction or address and we're in block view, switch to transaction view
+                            if ((nodeType === 'transaction' || nodeType === 'address') && currentZoomLevel === 'block') {
+                                // Switch to transaction view
+                                console.log(`Switching to transaction view to show ${nodeType}: ${nodeId}`);
+                                
+                                // Show notification
+                                updateStatus('active', `Switching to Transaction View to show ${nodeType}...`);
+                                
+                                currentZoomLevel = 'transaction';
+                                document.getElementById('zoom-level').textContent = 'Transaction View';
+                                const button = document.getElementById('zoom-toggle-btn');
+                                if (button) {
+                                    button.textContent = 'Switch to Block View';
+                                }
+                                
+                                // Reload graph in transaction view
+                                loadGraph().then(() => {
+                                    // After reload, focus on the node
+                                    setTimeout(() => {
+                                        focusNodeAfterLoad(nodeId);
+                                        updateStatus('active', 'Active');
+                                    }, 500);
+                                }).catch(err => {
+                                    console.error('Error loading graph:', err);
+                                    updateStatus('error', 'Error loading graph');
+                                });
+                            } else {
+                                // Node might not be loaded yet, try reloading graph
+                                loadGraph().then(() => {
+                                    setTimeout(() => {
+                                        focusNodeAfterLoad(nodeId);
+                                    }, 500);
+                                }).catch(err => {
+                                    console.error('Error loading graph:', err);
+                                });
+                            }
+                        } else {
+                            console.warn(`Node ${nodeId} not found in graph`);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching node info:', error);
+                        // Try reloading graph anyway
+                        loadGraph().then(() => {
+                            setTimeout(() => {
+                                focusNodeAfterLoad(nodeId);
+                            }, 500);
+                        });
+                    });
+                return;
+            }
+            
+            // Node exists, focus on it
+            focusNodeAfterLoad(nodeId);
+        }
+        
+        function focusNodeAfterLoad(nodeId) {
+            const node = nodes.get(nodeId);
+            if (!node) {
+                console.warn(`Node ${nodeId} still not found after reload`);
+                return;
+            }
+            
+            // Make sure node is visible
+            nodes.update({
+                id: nodeId,
+                hidden: false
+            });
+            
+            // Focus on the node
             if (network) {
                 network.focus(nodeId, {
                     animation: {
                         duration: 500,
                         easingFunction: 'easeInOutQuad'
+                    },
+                    scale: 1.5  // Zoom in a bit
+                });
+                
+                // Highlight connected nodes and edges
+                highlightConnectedNodes(nodeId);
+                
+                // Ensure connected edges are visible
+                const connectedEdges = edges.get({
+                    filter: function(edge) {
+                        return edge.from === nodeId || edge.to === nodeId;
                     }
                 });
-                highlightConnectedNodes(nodeId);
+                
+                connectedEdges.forEach(edge => {
+                    edges.update({
+                        id: edge.id,
+                        hidden: false,
+                        opacity: 1
+                    });
+                });
             }
         }
         
@@ -1345,7 +1572,7 @@
             if (!window.graphReloadPending) {
                 window.graphReloadPending = true;
                 setTimeout(() => {
-                    loadGraph();
+            loadGraph();
                     window.graphReloadPending = false;
                 }, 1000); // Debounce: wait 1 second after last update
             }
@@ -1461,6 +1688,9 @@
             const scheme = event.target.value;
             currentColorScheme = scheme;
             
+            // Update help description
+            showColorSchemeHelp();
+            
             // Reload activity metrics with new scheme
             fetch(`/api/analytics/activity?color_scheme=${scheme}`)
                 .then(response => response.json())
@@ -1508,11 +1738,41 @@
                 .then(data => {
                     flowPaths = data.paths || [];
                     highlightFlowPaths();
+                    
+                    // Show notification explaining what they're seeing
+                    if (flowPaths.length > 0) {
+                        showFlowPathNotification(flowPaths.length);
+                    }
                 })
                 .catch(error => {
                     console.error('Error loading flow paths:', error);
                 });
         }
+        
+        function showFlowPathNotification(pathCount) {
+            const notification = document.getElementById('flow-path-notification');
+            if (notification) {
+                // Update content with path count
+                const content = notification.querySelector('div > div');
+                if (content) {
+                    content.innerHTML = `Green highlighted edges show value flow paths from input addresses through this transaction to output addresses. <strong>Found ${pathCount} path${pathCount !== 1 ? 's' : ''}.</strong>`;
+                }
+                notification.classList.add('show');
+                // Auto-hide after 10 seconds
+                setTimeout(() => {
+                    hideFlowPathNotification();
+                }, 10000);
+            }
+        }
+        
+        function hideFlowPathNotification() {
+            const notification = document.getElementById('flow-path-notification');
+            if (notification) {
+                notification.classList.remove('show');
+            }
+        }
+        
+        window.hideFlowPathNotification = hideFlowPathNotification;
         
         function highlightFlowPaths() {
             // Clear previous highlights
@@ -1576,11 +1836,57 @@
             });
             
             flowPaths = [];
+            
+            // Hide notification
+            hideFlowPathNotification();
+        }
+        
+        // Analytics help functions
+        function toggleAnalyticsHelp() {
+            const helpDiv = document.getElementById('analytics-help');
+            const toggleBtn = document.getElementById('analytics-help-toggle');
+            if (helpDiv.style.display === 'none') {
+                helpDiv.style.display = 'block';
+                toggleBtn.textContent = '−';
+                toggleBtn.title = 'Hide Help';
+            } else {
+                helpDiv.style.display = 'none';
+                toggleBtn.textContent = '?';
+                toggleBtn.title = 'Show/Hide Help';
+            }
+        }
+        
+        function showColorSchemeHelp() {
+            const selector = document.getElementById('color-scheme-selector');
+            const descriptionDiv = document.getElementById('color-scheme-description');
+            const scheme = selector.value;
+            
+            const descriptions = {
+                'heatmap': 'Heatmap: Red (low activity) → Yellow (medium) → Green (high activity). Blocks show transaction count, transactions show input/output count, addresses show UTxO count.',
+                'activity': 'Activity: Blue (low activity) → Purple (medium) → Red (high activity). Same metrics as heatmap but with different color progression.',
+                'grayscale': 'Grayscale: Black (low activity) → Gray → White (high activity). Useful for printing or colorblind accessibility.'
+            };
+            
+            descriptionDiv.textContent = descriptions[scheme] || descriptions['heatmap'];
+            descriptionDiv.style.display = 'block';
+        }
+        
+        function hideColorSchemeHelp() {
+            // Keep description visible for a moment, then hide
+            setTimeout(() => {
+                const descriptionDiv = document.getElementById('color-scheme-description');
+                if (descriptionDiv && document.activeElement !== document.getElementById('color-scheme-selector')) {
+                    descriptionDiv.style.display = 'none';
+                }
+            }, 200);
         }
         
         // Make functions globally accessible
         window.changeColorScheme = changeColorScheme;
         window.recalculateAnalytics = recalculateAnalytics;
+        window.toggleAnalyticsHelp = toggleAnalyticsHelp;
+        window.showColorSchemeHelp = showColorSchemeHelp;
+        window.hideColorSchemeHelp = hideColorSchemeHelp;
         
         // Initialize - wait for DOM to be ready
         if (document.readyState === 'loading') {

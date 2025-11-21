@@ -421,25 +421,62 @@
         const MAX_VISIBLE_BLOCKS = 30;
         
         // Color coding functions
-        function getNodeColor(node) {
+        // Helper function to determine if a color is light (needs dark text)
+        function isLightColor(hexColor) {
+            // Remove # if present
+            hexColor = hexColor.replace('#', '');
+            // Convert to RGB
+            const r = parseInt(hexColor.substr(0, 2), 16);
+            const g = parseInt(hexColor.substr(2, 2), 16);
+            const b = parseInt(hexColor.substr(4, 2), 16);
+            // Calculate brightness (using relative luminance formula)
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            return brightness > 128;
+        }
+        
+        function getNodeColor(node, isLightTheme = false) {
             const type = node.type || 'unknown';
             const activityScore = node.activity_score || 0;
+            let colorObj = {};
             
             if (type === 'block') {
                 // Color blocks by activity: low (blue) -> medium (yellow) -> high (red)
-                if (activityScore < 30) {
-                    return { background: '#4a90e2', border: '#2e5c8a', highlight: { background: '#6ba3f0', border: '#4a90e2' } };
-                } else if (activityScore < 70) {
-                    return { background: '#f5a623', border: '#d68910', highlight: { background: '#ffb84d', border: '#f5a623' } };
+                if (isLightTheme) {
+                    // Light theme colors (more vibrant)
+                    if (activityScore < 30) {
+                        colorObj = { background: '#6ba3f0', border: '#4a90e2', highlight: { background: '#8bb5f5', border: '#6ba3f0' } };
+                    } else if (activityScore < 70) {
+                        colorObj = { background: '#ffb84d', border: '#f5a623', highlight: { background: '#ffc870', border: '#ffb84d' } };
+                    } else {
+                        colorObj = { background: '#ec7063', border: '#e74c3c', highlight: { background: '#f1948a', border: '#ec7063' } };
+                    }
                 } else {
-                    return { background: '#e74c3c', border: '#c0392b', highlight: { background: '#ec7063', border: '#e74c3c' } };
+                    // Dark theme colors (original)
+                    if (activityScore < 30) {
+                        colorObj = { background: '#4a90e2', border: '#2e5c8a', highlight: { background: '#6ba3f0', border: '#4a90e2' } };
+                    } else if (activityScore < 70) {
+                        colorObj = { background: '#f5a623', border: '#d68910', highlight: { background: '#ffb84d', border: '#f5a623' } };
+                    } else {
+                        colorObj = { background: '#e74c3c', border: '#c0392b', highlight: { background: '#ec7063', border: '#e74c3c' } };
+                    }
                 }
             } else if (type === 'transaction') {
-                return { background: '#ff6b6b', border: '#cc5555', highlight: { background: '#ff8888', border: '#ff6b6b' } };
+                colorObj = { background: '#ff6b6b', border: '#cc5555', highlight: { background: '#ff8888', border: '#ff6b6b' } };
             } else if (type === 'address') {
-                return { background: '#4ecdc4', border: '#3ba89f', highlight: { background: '#6eddd4', border: '#4ecdc4' } };
+                colorObj = { background: '#4ecdc4', border: '#3ba89f', highlight: { background: '#6eddd4', border: '#4ecdc4' } };
+            } else {
+                colorObj = { background: isLightTheme ? '#999999' : '#848484', border: isLightTheme ? '#777777' : '#666666' };
             }
-            return { background: '#848484', border: '#666666' };
+            
+            // Add font color based on background brightness for better contrast
+            const bgColor = colorObj.background || colorObj.highlight?.background || '#848484';
+            colorObj.font = {
+                color: isLightColor(bgColor) ? '#000000' : '#ffffff',
+                strokeWidth: 2,
+                strokeColor: isLightColor(bgColor) ? '#ffffff' : '#000000'
+            };
+            
+            return colorObj;
         }
         
         function getNodeSize(node) {
@@ -492,8 +529,9 @@
                     color: 'var(--text-primary)',
                     align: 'middle',
                     background: 'var(--bg-panel)',
-                    strokeWidth: 2,
-                    strokeColor: 'var(--bg-primary)'
+                    strokeWidth: 3,
+                    strokeColor: 'var(--bg-primary)',
+                    vadjust: -2
                 },
                 labelHighlightBold: true,
                 chosen: {
@@ -549,6 +587,10 @@
                     }
                 }
                 
+                // Use font color from color object if available, otherwise use theme-based color
+                const fontColor = color.font ? color.font.color : (isLight ? '#000000' : '#ffffff');
+                const fontStrokeColor = color.font ? color.font.strokeColor : (isLight ? '#ffffff' : '#000000');
+                
                 nodes.update({
                     id: nodeData.id,
                     color: color,
@@ -557,7 +599,9 @@
                     hidden: hidden,
                     font: {
                         size: type === 'block' ? 14 : 12,
-                        color: 'var(--text-primary)'
+                        color: fontColor,
+                        strokeWidth: 2,
+                        strokeColor: fontStrokeColor
                     }
                 });
             });

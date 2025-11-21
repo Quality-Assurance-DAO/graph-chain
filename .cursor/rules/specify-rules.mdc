@@ -1,0 +1,30 @@
+# graph-chain Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2025-11-21
+
+## Active Technologies
+
+- Python 3.10+ + Flask 3.x (web server), NetworkX (graph structure), PyVis (visualization), blockfrost-python (Cardano API), requests (HTTP), tenacity (retry logic) (001-cardano-graph-visualization)
+
+## Project Structure
+
+```text
+backend/
+frontend/
+tests/
+```
+
+## Commands
+
+cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLOGIES] pytest [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLOGIES] ruff check .
+
+## Code Style
+
+Python 3.10+: Follow standard conventions
+
+## Recent Changes
+
+- 001-cardano-graph-visualization: Added Python 3.10+ + Flask 3.x (web server), NetworkX (graph structure), PyVis (visualization), blockfrost-python (Cardano API), requests (HTTP), tenacity (retry logic)
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->

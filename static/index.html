@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cardano Blockchain Graph Visualization</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        /* CSS Variables for Theme System */
+        :root {
+            /* Dark Theme (default) */
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #3d3d3d;
+            --bg-panel: rgba(45, 45, 45, 0.9);
+            --text-primary: #ffffff;
+            --text-secondary: #aaaaaa;
+            --text-accent: #00d4ff;
+            --border-color: #3d3d3d;
+            --shadow-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        [data-theme="light"] {
+            /* Light Theme */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --bg-tertiary: #e0e0e0;
+            --bg-panel: rgba(245, 245, 245, 0.95);
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --text-accent: #0066cc;
+            --border-color: #cccccc;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        #header {
+            background-color: var(--bg-secondary);
+            padding: 15px 20px;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        #header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: var(--text-accent);
+            transition: color 0.3s ease;
+        }
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 10px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 12px;
+            color: var(--text-primary);
+        }
+        .theme-toggle:hover {
+            background-color: var(--bg-secondary);
+        }
+        .theme-toggle-icon {
+            font-size: 16px;
+        }
+        #status {
+            display: inline-block;
+            margin-left: 20px;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .status-active {
+            background-color: #4caf50;
+            color: white;
+        }
+        .status-paused {
+            background-color: #ff9800;
+            color: white;
+        }
+        .status-error {
+            background-color: #f44336;
+            color: white;
+        }
+        /* Status colors remain fixed for visibility in both themes */
+        #graph-container {
+            width: 100%;
+            height: calc(100vh - 80px);
+            background-color: var(--bg-primary);
+            transition: background-color 0.3s ease;
+        }
+        #info-panel {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            width: 300px;
+            background-color: var(--bg-panel);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 10px var(--shadow-color);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        #browse-panel {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            width: 350px;
+            background-color: var(--bg-panel);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-height: calc(100vh - 100px);
+            display: none;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 10px var(--shadow-color);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+            z-index: 1001;
+            overflow-y: auto;
+        }
+        #browse-panel.active {
+            display: block;
+        }
+        #browse-panel h3 {
+            margin-top: 0;
+            color: var(--text-accent);
+            transition: color 0.3s ease;
+        }
+        .search-box {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            color: var(--text-primary);
+            font-size: 12px;
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+        .search-box:focus {
+            outline: none;
+            border-color: var(--text-accent);
+        }
+        .filter-buttons {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        .filter-btn {
+            flex: 1;
+            padding: 5px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.3s ease;
+        }
+        .filter-btn:hover {
+            background-color: var(--bg-tertiary);
+        }
+        .filter-btn.active {
+            background-color: var(--text-accent);
+            color: var(--bg-primary);
+            border-color: var(--text-accent);
+        }
+        .node-list {
+            max-height: calc(100vh - 250px);
+            overflow-y: auto;
+        }
+        .node-item {
+            padding: 8px;
+            margin: 5px 0;
+            background-color: var(--bg-secondary);
+            border-left: 3px solid var(--text-accent);
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .node-item:hover {
+            background-color: var(--bg-tertiary);
+        }
+        .node-item.block {
+            border-left-color: var(--text-accent);
+        }
+        .node-item.transaction {
+            border-left-color: #ff6b6b;
+        }
+        .node-item.address {
+            border-left-color: #4ecdc4;
+        }
+        .node-label {
+            font-weight: bold;
+            color: var(--text-primary);
+            font-size: 12px;
+            transition: color 0.3s ease;
+        }
+        .node-details {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 3px;
+            transition: color 0.3s ease;
+        }
+        .toggle-browse {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            padding: 10px 15px;
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            color: var(--text-accent);
+            cursor: pointer;
+            font-size: 12px;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px var(--shadow-color);
+        }
+        .toggle-browse:hover {
+            background-color: var(--bg-secondary);
+        }
+        /* Hide toggle button when panel is open */
+        body:has(#browse-panel.active) .toggle-browse {
+            display: none;
+        }
+        #info-panel h3 {
+            margin-top: 0;
+            color: var(--text-accent);
+            transition: color 0.3s ease;
+        }
+        .info-item {
+            margin: 10px 0;
+            padding: 5px;
+            border-bottom: 1px solid var(--border-color);
+            transition: border-color 0.3s ease;
+        }
+        .info-label {
+            font-weight: bold;
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
+        }
+        .info-value {
+            color: var(--text-primary);
+            transition: color 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>Cardano Blockchain Graph Visualization</h1>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span id="status" class="status-active">Loading...</span>
+            <div class="theme-toggle" onclick="toggleTheme()" title="Toggle Light/Dark Mode">
+                <span class="theme-toggle-icon" id="theme-icon">🌙</span>
+                <span id="theme-label">Dark</span>
+            </div>
+        </div>
+    </div>
+    <button class="toggle-browse" onclick="toggleBrowsePanel()">📋 Browse Nodes</button>
+    <div id="browse-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin: 0;">Browse Captured Data</h3>
+            <button onclick="toggleBrowsePanel()" style="background: none; border: none; color: var(--text-accent); font-size: 20px; cursor: pointer; padding: 0; width: 24px; height: 24px; line-height: 1; transition: color 0.3s ease;" title="Close">×</button>
+        </div>
+        <input type="text" id="search-input" class="search-box" placeholder="Search nodes..." oninput="searchNodes()">
+        <div class="filter-buttons">
+            <button class="filter-btn active" onclick="filterNodes('', event)">All</button>
+            <button class="filter-btn" onclick="filterNodes('block', event)">Blocks</button>
+            <button class="filter-btn" onclick="filterNodes('transaction', event)">Txs</button>
+            <button class="filter-btn" onclick="filterNodes('address', event)">Addresses</button>
+        </div>
+        <div id="node-count-display" style="margin-bottom: 10px; color: var(--text-secondary); font-size: 11px;">
+            Showing 0 / 0 nodes (Max: 30)
+        </div>
+        <div id="node-list" class="node-list"></div>
+    </div>
+    <div id="graph-container"></div>
+    <div id="info-panel">
+        <h3>Graph Statistics</h3>
+        <div class="info-item">
+            <span class="info-label">Nodes:</span>
+            <span class="info-value" id="node-count">0</span> / 30 (max)
+        </div>
+        <div class="info-item">
+            <span class="info-label">Edges:</span>
+            <span class="info-value" id="edge-count">0</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Latest Block:</span>
+            <span class="info-value" id="latest-block">-</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Zoom Level:</span>
+            <span class="info-value" id="zoom-level">Block View</span>
+        </div>
+        <div class="info-item">
+            <button id="zoom-toggle-btn" onclick="toggleZoomLevel(event)" style="width: 100%; padding: 5px; background-color: var(--text-accent); border: none; border-radius: 3px; color: var(--bg-primary); cursor: pointer; font-weight: bold; transition: all 0.3s ease;">
+                Switch to Transaction View
+            </button>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Last Update:</span>
+            <span class="info-value" id="last-update">-</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">API Status:</span>
+            <span class="info-value" id="api-status">-</span>
+        </div>
+        <div class="info-item" id="rate-limit-warning" style="display: none;">
+            <span class="info-label" style="color: #ff9800;">Rate Limited:</span>
+            <span class="info-value" style="color: #ff9800;" id="rate-limit-info">-</span>
+        </div>
+        <div class="info-item" id="error-warning" style="display: none;">
+            <span class="info-label" style="color: #f44336;">Error:</span>
+            <span class="info-value" style="color: #f44336;" id="error-message">-</span>
+        </div>
+    </div>
+
+    <script>
+        // Theme Management
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            setTheme(savedTheme);
+        }
+        
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            
+            const icon = document.getElementById('theme-icon');
+            const label = document.getElementById('theme-label');
+            
+            if (icon && label) {
+                if (theme === 'light') {
+                    icon.textContent = '☀️';
+                    label.textContent = 'Light';
+                } else {
+                    icon.textContent = '🌙';
+                    label.textContent = 'Dark';
+                }
+            }
+            
+            // Update graph visualization colors
+            updateGraphTheme(theme);
+        }
+        
+        // Make toggleTheme globally accessible for onclick handlers
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setTheme(newTheme);
+        }
+        
+        // Expose to window for global access
+        window.toggleTheme = toggleTheme;
+        
+        function updateGraphTheme(theme) {
+            // Check if network and nodes are initialized (handle uninitialized variables)
+            if (typeof network === 'undefined' || network === null || 
+                typeof nodes === 'undefined' || nodes === null) {
+                return;
+            }
+            
+            const isLight = theme === 'light';
+            
+            // Update node colors based on theme
+            nodes.forEach(function(node) {
+                const nodeData = node;
+                const type = nodeData.type || 'unknown';
+                let color = getNodeColor(nodeData, isLight);
+                
+                nodes.update({
+                    id: nodeData.id,
+                    color: color
+                });
+            });
+            
+            // Update edge colors
+            if (edges) {
+                edges.forEach(function(edge) {
+                    const edgeColor = isLight ? '#666666' : '#848484';
+                    edges.update({
+                        id: edge.id,
+                        color: { color: edgeColor, highlight: '#00d4ff' }
+                    });
+                });
+            }
+        }
+        
+        // Initialize network variables (must be declared before initTheme)
+        let network = null;
+        let nodes = new vis.DataSet([]);
+        let edges = new vis.DataSet([]);
+        
+        // Initialize theme on page load (after variables are declared)
+        initTheme();
+        
+        const container = document.getElementById('graph-container');
+        const data = { nodes: nodes, edges: edges };
+        
+        // Zoom level state
+        let currentZoomLevel = 'block'; // 'block' or 'transaction'
+        let visibleBlocks = new Set();
+        let collapsedBlocks = new Set();
+        const MAX_VISIBLE_BLOCKS = 30;
+        
+        // Color coding functions
+        // Helper function to determine if a color is light (needs dark text)
+        function isLightColor(hexColor) {
+            // Remove # if present
+            hexColor = hexColor.replace('#', '');
+            // Convert to RGB
+            const r = parseInt(hexColor.substr(0, 2), 16);
+            const g = parseInt(hexColor.substr(2, 2), 16);
+            const b = parseInt(hexColor.substr(4, 2), 16);
+            // Calculate brightness (using relative luminance formula)
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            return brightness > 128;
+        }
+        
+        function getNodeColor(node, isLightTheme = false) {
+            const type = node.type || 'unknown';
+            const activityScore = node.activity_score || 0;
+            let colorObj = {};
+            
+            if (type === 'block') {
+                // Color blocks by activity: low (blue) -> medium (yellow) -> high (red)
+                if (isLightTheme) {
+                    // Light theme colors (more vibrant)
+                    if (activityScore < 30) {
+                        colorObj = { background: '#6ba3f0', border: '#4a90e2', highlight: { background: '#8bb5f5', border: '#6ba3f0' } };
+                    } else if (activityScore < 70) {
+                        colorObj = { background: '#ffb84d', border: '#f5a623', highlight: { background: '#ffc870', border: '#ffb84d' } };
+                    } else {
+                        colorObj = { background: '#ec7063', border: '#e74c3c', highlight: { background: '#f1948a', border: '#ec7063' } };
+                    }
+                } else {
+                    // Dark theme colors (original)
+                    if (activityScore < 30) {
+                        colorObj = { background: '#4a90e2', border: '#2e5c8a', highlight: { background: '#6ba3f0', border: '#4a90e2' } };
+                    } else if (activityScore < 70) {
+                        colorObj = { background: '#f5a623', border: '#d68910', highlight: { background: '#ffb84d', border: '#f5a623' } };
+                    } else {
+                        colorObj = { background: '#e74c3c', border: '#c0392b', highlight: { background: '#ec7063', border: '#e74c3c' } };
+                    }
+                }
+            } else if (type === 'transaction') {
+                colorObj = { background: '#ff6b6b', border: '#cc5555', highlight: { background: '#ff8888', border: '#ff6b6b' } };
+            } else if (type === 'address') {
+                colorObj = { background: '#4ecdc4', border: '#3ba89f', highlight: { background: '#6eddd4', border: '#4ecdc4' } };
+            } else {
+                colorObj = { background: isLightTheme ? '#999999' : '#848484', border: isLightTheme ? '#777777' : '#666666' };
+            }
+            
+            // Add font color based on background brightness for better contrast
+            const bgColor = colorObj.background || colorObj.highlight?.background || '#848484';
+            colorObj.font = {
+                color: isLightColor(bgColor) ? '#000000' : '#ffffff',
+                strokeWidth: 2,
+                strokeColor: isLightColor(bgColor) ? '#ffffff' : '#000000'
+            };
+            
+            return colorObj;
+        }
+        
+        function getNodeSize(node) {
+            const type = node.type || 'unknown';
+            const activityScore = node.activity_score || 0;
+            
+            if (type === 'block') {
+                // Size based on activity: 25-40 pixels
+                return 25 + (activityScore / 100) * 15;
+            } else if (type === 'transaction') {
+                return 22;
+            } else if (type === 'address') {
+                return 18;
+            }
+            return 16;
+        }
+        
+        const options = {
+            nodes: {
+                shape: 'dot',
+                size: 20,
+                font: {
+                    size: 12,
+                    color: 'var(--text-primary)',
+                    face: 'Arial'
+                },
+                borderWidth: 2,
+                shadow: true,
+                chosen: {
+                    node: function(values, id, selected, hovering) {
+                        if (hovering || selected) {
+                            values.size = 30;
+                            values.borderWidth = 4;
+                        }
+                    }
+                }
+            },
+            edges: {
+                width: 2,
+                color: { color: 'var(--text-secondary)' },
+                smooth: {
+                    type: 'continuous',
+                    roundness: 0.5
+                },
+                arrows: {
+                    to: { enabled: true, scaleFactor: 0.8 }
+                },
+                font: {
+                    size: 11,
+                    color: 'var(--text-primary)',
+                    align: 'middle',
+                    background: 'var(--bg-panel)',
+                    strokeWidth: 3,
+                    strokeColor: 'var(--bg-primary)',
+                    vadjust: -2
+                },
+                labelHighlightBold: true,
+                chosen: {
+                    edge: function(values, id, selected, hovering) {
+                        if (hovering || selected) {
+                            values.width = 4;
+                            values.color = { color: '#00d4ff' };
+                        }
+                    }
+                }
+            },
+            physics: {
+                enabled: true,
+                stabilization: {
+                    iterations: 100
+                }
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 100
+            }
+        };
+        
+        network = new vis.Network(container, data, options);
+        
+        // Node styling based on type (T032 - visual distinction)
+        network.on('stabilizationEnd', function() {
+            updateNodeStyles();
+        });
+        
+        function updateNodeStyles() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const isLight = currentTheme === 'light';
+            
+            nodes.forEach(function(node) {
+                const nodeData = node;
+                const type = nodeData.type || 'unknown';
+                const color = getNodeColor(nodeData, isLight);
+                const size = getNodeSize(nodeData);
+                
+                let shape = 'dot';
+                if (type === 'block') shape = 'box';
+                else if (type === 'transaction') shape = 'diamond';
+                else if (type === 'address') shape = 'dot';
+                
+                // Apply visibility based on zoom level
+                let hidden = false;
+                if (currentZoomLevel === 'block' && type !== 'block' && type !== 'chain') {
+                    // In block view, hide transactions and addresses unless block is expanded
+                    const blockId = findBlockForNode(nodeData.id);
+                    if (blockId && !visibleBlocks.has(blockId)) {
+                        hidden = true;
+                    }
+                }
+                
+                // Use font color from color object if available, otherwise use theme-based color
+                const fontColor = color.font ? color.font.color : (isLight ? '#000000' : '#ffffff');
+                const fontStrokeColor = color.font ? color.font.strokeColor : (isLight ? '#ffffff' : '#000000');
+                
+                nodes.update({
+                    id: nodeData.id,
+                    color: color,
+                    shape: shape,
+                    size: size,
+                    hidden: hidden,
+                    font: {
+                        size: type === 'block' ? 14 : 12,
+                        color: fontColor,
+                        strokeWidth: 2,
+                        strokeColor: fontStrokeColor
+                    }
+                });
+            });
+        }
+        
+        function findBlockForNode(nodeId) {
+            // Find which block a transaction or address belongs to
+            const node = nodes.get(nodeId);
+            if (!node) return null;
+            
+            if (node.type === 'block') return nodeId;
+            
+            // Check edges to find connected block
+            const nodeEdges = edges.get({
+                filter: function(edge) {
+                    return edge.from === nodeId || edge.to === nodeId;
+                }
+            });
+            
+            for (let edge of nodeEdges) {
+                const otherId = edge.from === nodeId ? edge.to : edge.from;
+                const otherNode = nodes.get(otherId);
+                if (otherNode && otherNode.type === 'block') {
+                    return otherId;
+                }
+            }
+            return null;
+        }
+        
+        // Dynamic collapsing: keep only recent blocks visible
+        function updateVisibleBlocks() {
+            if (!nodes || nodes.length === 0) return;
+            
+            try {
+                const blockNodes = Array.from(nodes.get({
+                    filter: function(node) {
+                        return node.type === 'block';
+                    }
+                }));
+                
+                if (blockNodes.length === 0) return;
+                
+                // Sort by height (newest first)
+                blockNodes.sort((a, b) => (b.height || 0) - (a.height || 0));
+                
+                // Keep only the most recent MAX_VISIBLE_BLOCKS
+                const recentBlocks = new Set(blockNodes.slice(0, MAX_VISIBLE_BLOCKS).map(n => n.id));
+                
+                // Update visible blocks set
+                visibleBlocks = recentBlocks;
+                
+                // Collapse older blocks
+                blockNodes.forEach(node => {
+                    if (!recentBlocks.has(node.id)) {
+                        collapsedBlocks.add(node.id);
+                    } else {
+                        collapsedBlocks.delete(node.id);
+                    }
+                });
+            } catch (error) {
+                console.error('Error updating visible blocks:', error);
+            }
+        }
+        
+        function toggleZoomLevel(event) {
+            currentZoomLevel = currentZoomLevel === 'block' ? 'transaction' : 'block';
+            document.getElementById('zoom-level').textContent = 
+                currentZoomLevel === 'block' ? 'Block View' : 'Transaction View';
+            
+            // Update button text
+            const button = event && event.target ? event.target : document.getElementById('zoom-toggle-btn');
+            if (button) {
+                button.textContent = currentZoomLevel === 'block' 
+                    ? 'Switch to Transaction View' 
+                    : 'Switch to Block View';
+            }
+            
+            // Reload graph with appropriate view
+            loadGraph();
+            
+            // Update visibility after a short delay to ensure nodes are loaded
+            setTimeout(() => {
+                updateNodeStyles();
+                if (network) {
+                    network.fit({
+                        animation: {
+                            duration: 500,
+                            easingFunction: 'easeInOutQuad'
+                        }
+                    });
+                }
+            }, 100);
+        }
+        
+        // Handle zoom events for dynamic expansion
+        network.on('zoom', function(params) {
+            const scale = params.scale;
+            // When zoomed in enough, show transaction details
+            if (scale > 1.5 && currentZoomLevel === 'block') {
+                // Could auto-expand blocks here
+            }
+        });
+        
+        // Double-click to expand/collapse blocks
+        network.on('doubleClick', function(params) {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                const node = nodes.get(nodeId);
+                if (node && node.type === 'block') {
+                    if (visibleBlocks.has(nodeId)) {
+                        visibleBlocks.delete(nodeId);
+                    } else {
+                        visibleBlocks.add(nodeId);
+                    }
+                    updateNodeStyles();
+                }
+            }
+        });
+        
+        // Node interaction handlers (T031 - highlight connected nodes)
+        let highlightedNodes = new Set();
+        let highlightedEdges = new Set();
+        
+        network.on('hoverNode', function(params) {
+            highlightConnectedNodes(params.node);
+        });
+        
+        network.on('blurNode', function(params) {
+            unhighlightNodes();
+        });
+        
+        network.on('click', function(params) {
+            if (params.nodes.length > 0) {
+                highlightConnectedNodes(params.nodes[0]);
+            } else {
+                unhighlightNodes();
+            }
+        });
+        
+        function highlightConnectedNodes(nodeId) {
+            unhighlightNodes();
+            
+            // Get all connected nodes
+            const connectedNodeIds = new Set();
+            const connectedEdgeIds = new Set();
+            
+            // Get edges connected to this node
+            edges.forEach(function(edge) {
+                if (edge.from === nodeId || edge.to === nodeId) {
+                    connectedEdgeIds.add(edge.id);
+                    if (edge.from === nodeId) connectedNodeIds.add(edge.to);
+                    if (edge.to === nodeId) connectedNodeIds.add(edge.from);
+                }
+            });
+            
+            // Highlight connected nodes and edges
+            connectedNodeIds.forEach(function(id) {
+                highlightedNodes.add(id);
+                nodes.update({ id: id, opacity: 0.3 });
+            });
+            highlightedEdges = connectedEdgeIds;
+            edges.forEach(function(edge) {
+                if (connectedEdgeIds.has(edge.id)) {
+                    edges.update({ id: edge.id, color: { color: '#00d4ff', highlight: '#00d4ff' } });
+                } else {
+                    edges.update({ id: edge.id, opacity: 0.1 });
+                }
+            });
+            
+            // Keep selected node fully visible
+            nodes.update({ id: nodeId, opacity: 1 });
+        }
+        
+        function unhighlightNodes() {
+            highlightedNodes.forEach(function(id) {
+                nodes.update({ id: id, opacity: 1 });
+            });
+            highlightedNodes.clear();
+            
+            edges.forEach(function(edge) {
+                edges.update({ id: edge.id, opacity: 1, color: { color: '#848484' } });
+            });
+            highlightedEdges.clear();
+        }
+        
+        // Load initial graph state
+        function loadGraph() {
+            const maxBlocks = currentZoomLevel === 'block' ? MAX_VISIBLE_BLOCKS : null;
+            const url = maxBlocks ? `/api/graph?max_blocks=${maxBlocks}` : '/api/graph';
+            
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data) {
+                        console.error('No data returned from API');
+                        updateStatus('error', 'No data returned');
+                        return;
+                    }
+                    console.log('Graph data loaded:', { nodes: data.nodes?.length || 0, edges: data.edges?.length || 0 });
+                    if (data.nodes && data.edges) {
+                        nodes.clear();
+                        edges.clear();
+                        
+                        // Filter nodes and edges based on zoom level
+                        let nodesToAdd = data.nodes;
+                        let edgesToAdd = data.edges;
+                        
+                        if (currentZoomLevel === 'block') {
+                            // In block view, show only blocks and chain edges
+                            nodesToAdd = data.nodes.filter(node => node.type === 'block');
+                            edgesToAdd = data.edges.filter(edge => edge.type === 'chain');
+                        }
+                        
+                        nodes.add(nodesToAdd.map(node => ({
+                            id: node.id,
+                            label: node.label || node.id,
+                            type: node.type,
+                            title: JSON.stringify(node.data, null, 2),
+                            activity_score: node.activity_score || 0,
+                            height: node.height,
+                            tx_count: node.tx_count || 0,
+                            level: node.level || 0
+                        })));
+                        
+                        // Track visible blocks
+                        nodesToAdd.forEach(node => {
+                            if (node.type === 'block') {
+                                visibleBlocks.add(node.id);
+                            }
+                        });
+                        
+                        // Get current theme for edge colors
+                        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+                        const isLight = currentTheme === 'light';
+                        const defaultEdgeColor = isLight ? '#666666' : '#848484';
+                        
+                        edges.add(edgesToAdd.map(edge => {
+                            // Enhanced edge labeling (T030 - show amounts and types)
+                            let edgeLabel = edge.label || '';
+                            let edgeTitle = `Type: ${edge.type}`;
+                            let edgeWidth = 2;
+                            let edgeColor = defaultEdgeColor;
+                            
+                            if (edge.type === 'chain') {
+                                // Chain edges (block to block) are thicker and more prominent
+                                edgeWidth = 4;
+                                edgeColor = '#00d4ff'; // Keep accent color for chain edges
+                                edgeLabel = '';
+                                edgeTitle = 'Block Chain';
+                            } else if (edge.type === 'tx_output' && edge.weight) {
+                                edgeTitle += `\nAmount: ${edge.label || edge.weight}`;
+                                edgeWidth = 2;
+                            } else if (edge.type === 'tx_input') {
+                                edgeTitle += '\nInput connection';
+                                edgeWidth = 1.5;
+                            } else if (edge.type === 'block_tx') {
+                                edgeTitle += '\nBlock contains transaction';
+                                edgeWidth = 2;
+                            }
+                            
+                            return {
+                                id: edge.from + '-' + edge.to,
+                                from: edge.from,
+                                to: edge.to,
+                                label: edgeLabel,
+                                title: edgeTitle,
+                                type: edge.type,
+                                weight: edge.weight || 1,
+                                width: edgeWidth,
+                                color: { color: edgeColor, highlight: '#00d4ff' }
+                            };
+                        }));
+                        updateVisibleBlocks();
+                        updateNodeStyles();
+                        updateStats(data.metadata);
+                        
+                        // Update graph theme after loading (reuse currentTheme from above)
+                        updateGraphTheme(currentTheme);
+                        
+                        // Update status to active after successful load
+                        updateStatus('active', 'Active');
+                        
+                        // Refresh browse panel if it's open
+                        if (document.getElementById('browse-panel').classList.contains('active')) {
+                            loadBrowseNodes();
+                        }
+                        
+                        // Auto-fit to show block sequence
+                        if (network && currentZoomLevel === 'block') {
+                            setTimeout(() => {
+                                network.fit({
+                                    animation: {
+                                        duration: 1000,
+                                        easingFunction: 'easeInOutQuad'
+                                    }
+                                });
+                            }, 500);
+                        }
+                    } else {
+                        console.error('Invalid graph data structure. Expected nodes and edges:', data);
+                        updateStatus('error', 'Invalid data structure');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading graph:', error);
+                    updateStatus('error', 'Error loading graph: ' + error.message);
+                });
+        }
+        
+        // Update statistics display
+        function updateStats(metadata) {
+            if (metadata) {
+                document.getElementById('node-count').textContent = metadata.node_count || 0;
+                document.getElementById('edge-count').textContent = metadata.edge_count || 0;
+                document.getElementById('latest-block').textContent = metadata.latest_block_height || '-';
+                document.getElementById('last-update').textContent = 
+                    metadata.last_update ? new Date(metadata.last_update).toLocaleTimeString() : '-';
+            }
+        }
+        
+        // Browse panel functionality
+        let currentFilter = '';
+        let currentSearch = '';
+        
+        function toggleBrowsePanel() {
+            const panel = document.getElementById('browse-panel');
+            const toggleButton = document.querySelector('.toggle-browse');
+            panel.classList.toggle('active');
+            if (panel.classList.contains('active')) {
+                loadBrowseNodes();
+                // Hide toggle button when panel is open
+                if (toggleButton) {
+                    toggleButton.style.display = 'none';
+                }
+            } else {
+                // Show toggle button when panel is closed
+                if (toggleButton) {
+                    toggleButton.style.display = 'block';
+                }
+            }
+        }
+        
+        function filterNodes(type, event) {
+            currentFilter = type;
+            
+            // Update button states - remove active from all
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Add active to the clicked button
+            if (event && event.target) {
+                event.target.classList.add('active');
+            } else {
+                // Fallback: find button by matching the type
+                const buttons = document.querySelectorAll('.filter-btn');
+                buttons.forEach(btn => {
+                    const btnText = btn.textContent.trim().toLowerCase();
+                    if ((type === '' && btnText === 'all') ||
+                        (type === 'block' && btnText === 'blocks') ||
+                        (type === 'transaction' && btnText === 'txs') ||
+                        (type === 'address' && btnText === 'addresses')) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
+            
+            loadBrowseNodes();
+        }
+        
+        function searchNodes() {
+            currentSearch = document.getElementById('search-input').value;
+            loadBrowseNodes();
+        }
+        
+        function loadBrowseNodes() {
+            const params = new URLSearchParams();
+            if (currentSearch) params.append('q', currentSearch);
+            if (currentFilter) params.append('type', currentFilter);
+            params.append('limit', 100);
+            
+            fetch('/api/nodes?' + params.toString())
+                .then(response => response.json())
+                .then(data => {
+                    displayBrowseNodes(data.nodes, data.total);
+                })
+                .catch(error => {
+                    console.error('Error loading nodes:', error);
+                    document.getElementById('node-list').innerHTML = '<div style="color: #f44336;">Error loading nodes</div>';
+                    // Error color stays red for visibility
+                });
+        }
+        
+        function displayBrowseNodes(nodeList, total) {
+            const container = document.getElementById('node-list');
+            const countDisplay = document.getElementById('node-count-display');
+            
+            countDisplay.textContent = `Showing ${nodeList.length} / ${total} nodes (Max: 30)`;
+            
+            if (nodeList.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-secondary); padding: 20px; text-align: center;">No nodes found</div>';
+                return;
+            }
+            
+            container.innerHTML = nodeList.map(node => {
+                const type = node.type || 'unknown';
+                const label = node.label || node.id;
+                const data = node.data || {};
+                
+                let details = '';
+                if (type === 'block') {
+                    details = `Height: ${data.block_height || 'N/A'} | Hash: ${(data.block_hash || '').substring(0, 16)}...`;
+                } else if (type === 'transaction') {
+                    details = `Hash: ${(data.tx_hash || '').substring(0, 16)}... | Block: ${data.block_height || 'N/A'}`;
+                } else if (type === 'address') {
+                    details = `Address: ${(data.address || '').substring(0, 20)}... | Tx Count: ${data.transaction_count || 0}`;
+                }
+                
+                return `
+                    <div class="node-item ${type}" onclick="focusNode('${node.id}')">
+                        <div class="node-label">${label}</div>
+                        <div class="node-details">${details}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function focusNode(nodeId) {
+            // Focus on the node in the graph
+            if (network) {
+                network.focus(nodeId, {
+                    animation: {
+                        duration: 500,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+                highlightConnectedNodes(nodeId);
+            }
+        }
+        
+        // Update status indicator
+        function updateStatus(status, message) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = 'status-' + status;
+            statusEl.textContent = message;
+        }
+        
+        // Connect to SSE stream for real-time updates
+        function connectSSE() {
+            const eventSource = new EventSource('/api/graph/updates');
+            
+            eventSource.addEventListener('graph_update', function(event) {
+                try {
+                    const update = JSON.parse(event.data);
+                    handleGraphUpdate(update);
+                    // Refresh browse panel if it's open
+                    if (document.getElementById('browse-panel').classList.contains('active')) {
+                        loadBrowseNodes();
+                    }
+                } catch (error) {
+                    console.error('Error parsing SSE update:', error);
+                }
+            });
+            
+            eventSource.onerror = function(error) {
+                console.error('SSE error:', error);
+                eventSource.close();
+                // Retry connection after delay
+                setTimeout(connectSSE, 5000);
+            };
+        }
+        
+        // Handle graph update events
+        function handleGraphUpdate(update) {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const isLight = currentTheme === 'light';
+            
+            if (update.type === 'node_added' && update.node) {
+                const node = update.node;
+                
+                // Check if node already exists
+                if (nodes.get(node.id)) {
+                    // Update existing node instead of adding
+                    const nodeData = {
+                        id: node.id,
+                        label: node.label || node.data.label || node.id,
+                        type: node.type,
+                        title: JSON.stringify(node.data, null, 2),
+                        activity_score: node.activity_score || 0,
+                        height: node.height,
+                        tx_count: node.tx_count || 0
+                    };
+                    nodes.update(nodeData);
+                    return;
+                }
+                
+                const nodeData = {
+                    id: node.id,
+                    label: node.label || node.data.label || node.id,
+                    type: node.type,
+                    title: JSON.stringify(node.data, null, 2),
+                    activity_score: node.activity_score || 0,
+                    height: node.height,
+                    tx_count: node.tx_count || 0
+                };
+                
+                // Animate new node appearance
+                nodes.add({
+                    ...nodeData,
+                    opacity: 0,
+                    size: 0
+                });
+                
+                // Animate to full visibility
+                setTimeout(() => {
+                    nodes.update({
+                        id: node.id,
+                        opacity: 1,
+                        size: getNodeSize(nodeData),
+                        color: getNodeColor(nodeData, isLight)
+                    });
+                }, 50);
+                
+                // If it's a block, add to visible set
+                if (node.type === 'block') {
+                    visibleBlocks.add(node.id);
+                }
+                
+                updateNodeStyles();
+                
+                // Animate camera to new block if it's a block node
+                if (node.type === 'block' && network) {
+                    setTimeout(() => {
+                        network.focus(node.id, {
+                            animation: {
+                                duration: 800,
+                                easingFunction: 'easeInOutQuad'
+                            },
+                            scale: 1.2
+                        });
+                    }, 200);
+                }
+            } else if (update.type === 'edge_added' && update.edge) {
+                const edge = update.edge;
+                const edgeId = edge.from + '-' + edge.to;
+                
+                // Check if edge already exists
+                if (edges.get(edgeId)) {
+                    // Update existing edge instead of adding
+                    let edgeTitle = `Type: ${edge.type}`;
+                    if (edge.type === 'tx_output' && edge.weight) {
+                        edgeTitle += `\nAmount: ${edge.label || edge.weight}`;
+                    }
+                    const edgeColor = isLight ? '#666666' : '#848484';
+                    edges.update({
+                        id: edgeId,
+                        from: edge.from,
+                        to: edge.to,
+                        label: edge.label || '',
+                        title: edgeTitle,
+                        type: edge.type,
+                        weight: edge.weight || 1,
+                        color: { color: edgeColor, highlight: '#00d4ff' }
+                    });
+                    return;
+                }
+                
+                let edgeTitle = `Type: ${edge.type}`;
+                if (edge.type === 'tx_output' && edge.weight) {
+                    edgeTitle += `\nAmount: ${edge.label || edge.weight}`;
+                }
+                
+                const edgeColor = isLight ? '#666666' : '#848484';
+                const edgeData = {
+                    id: edgeId,
+                    from: edge.from,
+                    to: edge.to,
+                    label: edge.label || '',
+                    title: edgeTitle,
+                    type: edge.type,
+                    weight: edge.weight || 1,
+                    opacity: 0,
+                    width: 0,
+                    color: { color: edgeColor, highlight: '#00d4ff' }
+                };
+                
+                edges.add(edgeData);
+                
+                // Animate edge appearance
+                setTimeout(() => {
+                    edges.update({
+                        id: edgeData.id,
+                        opacity: 1,
+                        width: edge.type === 'chain' ? 3 : 2
+                    });
+                }, 100);
+            }
+            
+            // Refresh stats periodically
+            loadGraph();
+        }
+        
+        // Check system status (T038 - status display UI)
+        function checkStatus() {
+            fetch('/api/status')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Update status with proper capitalization
+                    const status = data.status || 'active';
+                    const statusMessage = status.charAt(0).toUpperCase() + status.slice(1);
+                    updateStatus(status, statusMessage);
+                    
+                    // Update API status
+                    document.getElementById('api-status').textContent = data.api_status || '-';
+                    
+                    // Update rate limit warning (T038)
+                    const rateLimitWarning = document.getElementById('rate-limit-warning');
+                    const rateLimitInfo = document.getElementById('rate-limit-info');
+                    if (data.rate_limit_status && data.rate_limit_status.limited) {
+                        rateLimitWarning.style.display = 'block';
+                        const retryAfter = data.rate_limit_status.retry_after || 'unknown';
+                        rateLimitInfo.textContent = `Retry in ${retryAfter}s`;
+                    } else {
+                        rateLimitWarning.style.display = 'none';
+                    }
+                    
+                    // Update error warning (T038, T040)
+                    const errorWarning = document.getElementById('error-warning');
+                    const errorMessage = document.getElementById('error-message');
+                    if (data.error_message) {
+                        errorWarning.style.display = 'block';
+                        errorMessage.textContent = data.error_message.substring(0, 50) + '...';
+                    } else {
+                        errorWarning.style.display = 'none';
+                    }
+                    
+                    // Update last block fetched
+                    if (data.last_block_fetched) {
+                        document.getElementById('last-update').textContent = 
+                            new Date(data.last_block_fetched).toLocaleTimeString();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking status:', error);
+                    updateStatus('error', 'Status check failed');
+                });
+        }
+        
+        // Initialize - wait for DOM to be ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                loadGraph();
+                connectSSE();
+                checkStatus();
+                setInterval(checkStatus, 10000); // Check status every 10 seconds
+            });
+        } else {
+            // DOM is already ready
+            loadGraph();
+            connectSSE();
+            checkStatus();
+            setInterval(checkStatus, 10000); // Check status every 10 seconds
+        }
+    </script>
+</body>
+</html>
+

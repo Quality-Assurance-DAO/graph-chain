@@ -5,6 +5,16 @@
 **Status**: Draft  
 **Input**: User description: "add the ability to perform lightweight, local graph analytics on the subset of data you have loaded, such as: Block/transaction node degree, Count number of transactions per block (block node degree), Count number of inputs/outputs per transaction (transaction node degree), Useful to highlight "busy" blocks or high-activity transactions, Simple clustering on small graphs, Cluster addresses or transactions in the last N blocks (e.g., last 20–50 blocks), Useful to identify small clusters of repeated interactions, Transaction flow visualization, Show token/ADA movement from inputs → outputs for recent transactions, Can highlight paths in the last few blocks, Basic anomaly spotting, Highlight unusually large transactions in the fetched subset, Flag blocks with unusually many transactions, Color coding & heatmaps, Use node color to indicate transaction count or UTxO count per node, Visual feedback helps users understand which blocks/transactions are "hot""
 
+## Clarifications
+
+### Session 2025-01-27
+
+- Q: What specific anomaly detection method and thresholds should be used? → A: Percentile-based detection: Flag transactions/blocks above 95th percentile or below 5th percentile (minimum 10 nodes required)
+- Q: What default color scheme should be used for activity visualization? → A: Heatmap scheme: Red (low activity) → Yellow (medium) → Green (high activity)
+- Q: What default clustering time window should be used? → A: Last 30 blocks (configurable range: 20-50 blocks)
+- Q: How should users trigger transaction flow path visualization? → A: Click to select: User clicks a transaction node to show its flow paths
+- Q: What user feedback should be shown during analytics calculations? → A: Loading indicator: Show spinner/progress message during calculations
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Identify High-Activity Blocks and Transactions (Priority: P1)
@@ -34,7 +44,7 @@ A user wants to quickly understand activity levels across the graph through visu
 
 **Acceptance Scenarios**:
 
-1. **Given** the system displays blocks with varying transaction counts, **When** a user views the graph, **Then** block nodes are colored according to their transaction count (e.g., darker/more intense colors for higher counts)
+1. **Given** the system displays blocks with varying transaction counts, **When** a user views the graph, **Then** block nodes are colored using heatmap scheme (red for low, yellow for medium, green for high transaction counts)
 2. **Given** the system displays transactions with varying input/output counts, **When** a user views the graph, **Then** transaction nodes are colored according to their input/output count
 3. **Given** the system displays addresses with varying UTxO counts, **When** a user views the graph, **Then** address nodes are colored according to their UTxO count
 4. **Given** nodes are color-coded by activity, **When** a user views the graph, **Then** they can immediately identify the most active nodes without reading labels
@@ -60,7 +70,7 @@ A user wants to identify unusual patterns in the blockchain data they've loaded,
 
 ### User Story 4 - Cluster Related Addresses and Transactions (Priority: P2)
 
-A user wants to identify clusters of addresses or transactions that frequently interact with each other within a recent time window (e.g., last 20-50 blocks). This helps them understand relationship patterns and identify groups of related activity.
+A user wants to identify clusters of addresses or transactions that frequently interact with each other within a recent time window (default: last 30 blocks, configurable: 20-50 blocks). This helps them understand relationship patterns and identify groups of related activity.
 
 **Why this priority**: Clustering reveals relationship patterns that aren't immediately obvious from individual connections. This enables users to understand groups and repeated interactions.
 
@@ -68,8 +78,8 @@ A user wants to identify clusters of addresses or transactions that frequently i
 
 **Acceptance Scenarios**:
 
-1. **Given** the system has loaded data from the last N blocks (e.g., 20-50 blocks), **When** addresses frequently interact with each other, **Then** they are grouped into a cluster
-2. **Given** the system has loaded data from the last N blocks, **When** transactions share common addresses, **Then** they are grouped into a cluster
+1. **Given** the system has loaded data from the last N blocks (default: 30 blocks, configurable: 20-50 blocks), **When** addresses frequently interact with each other, **Then** they are grouped into a cluster
+2. **Given** the system has loaded data from the last N blocks (default: 30 blocks), **When** transactions share common addresses, **Then** they are grouped into a cluster
 3. **Given** clusters are identified, **When** a user views the graph, **Then** they can visually distinguish different clusters
 4. **Given** clusters are displayed, **When** a user examines a cluster, **Then** they can see which addresses or transactions belong to that cluster
 
@@ -85,8 +95,8 @@ A user wants to see how value (ADA or tokens) flows from input addresses through
 
 **Acceptance Scenarios**:
 
-1. **Given** the system has loaded recent transactions, **When** a user selects a transaction, **Then** they can see the flow path from input addresses through the transaction to output addresses
-2. **Given** multiple connected transactions exist, **When** a user views the graph, **Then** they can see highlighted paths showing value flow through multiple transactions
+1. **Given** the system has loaded recent transactions, **When** a user clicks a transaction node, **Then** they can see the flow path from input addresses through the transaction to output addresses
+2. **Given** multiple connected transactions exist, **When** a user clicks a transaction node, **Then** they can see highlighted paths showing value flow through multiple connected transactions
 3. **Given** transaction flows are displayed, **When** a user examines a flow path, **Then** they can see the value amounts at each step
 4. **Given** transaction flows are visualized, **When** a user views recent blocks, **Then** they can identify common flow patterns
 
@@ -99,10 +109,11 @@ A user wants to see how value (ADA or tokens) flows from input addresses through
 - What occurs when all transactions have the same input/output count (no variation)?
 - How does clustering behave when there are no repeated interactions in the time window?
 - What happens when anomaly thresholds result in flagging all or none of the transactions?
-- How does the system handle very small datasets (e.g., only 1-2 blocks loaded)?
+- How does the system handle very small datasets (e.g., only 1-2 blocks loaded)? (Anomaly detection requires minimum 10 nodes; smaller datasets skip anomaly detection)
 - What occurs when transaction values are missing or zero?
 - How does color coding work when all nodes have identical activity levels?
 - What happens when clustering identifies a single large cluster containing most nodes?
+- How does the system handle user interactions during analytics calculation periods? (Loading indicator shown, interactions may be queued or disabled)
 
 ## Requirements *(mandatory)*
 
@@ -117,15 +128,16 @@ A user wants to see how value (ADA or tokens) flows from input addresses through
 - **FR-007**: System MUST identify transactions with unusually large values compared to other transactions in the loaded dataset
 - **FR-008**: System MUST identify blocks with unusually high transaction counts compared to other blocks in the loaded dataset
 - **FR-009**: System MUST visually highlight or flag nodes identified as anomalies
-- **FR-010**: System MUST support clustering addresses that frequently interact within a configurable time window (e.g., last 20-50 blocks)
-- **FR-011**: System MUST support clustering transactions that share common addresses within a configurable time window
+- **FR-010**: System MUST support clustering addresses that frequently interact within a configurable time window (default: last 30 blocks, configurable range: 20-50 blocks)
+- **FR-011**: System MUST support clustering transactions that share common addresses within a configurable time window (default: last 30 blocks, configurable range: 20-50 blocks)
 - **FR-012**: System MUST visually distinguish different clusters in the graph display
-- **FR-013**: System MUST visualize transaction flow paths showing value movement from inputs through transactions to outputs
-- **FR-014**: System MUST highlight flow paths for recent transactions (e.g., last few blocks)
+- **FR-013**: System MUST visualize transaction flow paths showing value movement from inputs through transactions to outputs when a user clicks a transaction node
+- **FR-014**: System MUST highlight flow paths for recent transactions (e.g., last few blocks) in response to user click interaction
 - **FR-015**: System MUST display value amounts along transaction flow paths
 - **FR-016**: System MUST perform all analytics calculations locally on the loaded data subset
 - **FR-017**: System MUST update analytics metrics when new data is loaded
 - **FR-018**: System MUST provide visual feedback indicating activity levels through color intensity or hue gradients
+- **FR-019**: System MUST display a loading indicator (spinner/progress message) during analytics calculations to inform users of processing status
 
 ### Key Entities *(include if feature involves data)*
 
@@ -137,13 +149,13 @@ A user wants to see how value (ADA or tokens) flows from input addresses through
 
 - **Activity Metric**: A calculated value representing the activity level of a node (transaction count, input/output count, UTxO count). Used for color coding and anomaly detection.
 
-- **Anomaly**: A node (block or transaction) that exhibits unusual characteristics compared to other nodes in the loaded dataset (e.g., unusually large value, unusually high transaction count).
+- **Anomaly**: A node (block or transaction) that exhibits unusual characteristics compared to other nodes in the loaded dataset. Detected using percentile-based method: flagged if value exceeds 95th percentile or falls below 5th percentile (requires minimum 10 nodes for detection).
 
-- **Cluster**: A group of addresses or transactions that frequently interact with each other within a specified time window. Identified through relationship analysis of the loaded data.
+- **Cluster**: A group of addresses or transactions that frequently interact with each other within a specified time window (default: last 30 blocks, configurable: 20-50 blocks). Identified through relationship analysis of the loaded data.
 
-- **Transaction Flow Path**: A sequence of connections showing how value moves from input addresses through transactions to output addresses. Represents the movement of ADA or tokens through the graph.
+- **Transaction Flow Path**: A sequence of connections showing how value moves from input addresses through transactions to output addresses. Represents the movement of ADA or tokens through the graph. Visualized when user clicks a transaction node.
 
-- **Color Mapping**: A visual encoding scheme that maps activity metrics to colors, enabling users to quickly identify activity levels through visual inspection.
+- **Color Mapping**: A visual encoding scheme that maps activity metrics to colors using heatmap scheme (red → yellow → green), enabling users to quickly identify activity levels through visual inspection.
 
 ## Success Criteria *(mandatory)*
 
@@ -165,12 +177,12 @@ A user wants to see how value (ADA or tokens) flows from input addresses through
 - Users have already loaded blockchain data into the system (analytics operate on loaded data subset)
 - The loaded data subset contains at least a few blocks and transactions to enable meaningful analytics
 - Users understand basic graph analytics concepts (node degree, clustering, flow paths)
-- Color coding uses standard visual conventions (e.g., darker/more intense colors for higher values)
-- Anomaly detection uses statistical methods appropriate for the dataset size (e.g., z-scores, percentiles)
+- Color coding uses heatmap scheme: Red (low activity) → Yellow (medium) → Green (high activity) for all node types
+- Anomaly detection uses percentile-based method: flags nodes above 95th percentile or below 5th percentile, requiring minimum 10 nodes in dataset for statistical validity
 - Clustering algorithms can operate efficiently on small to medium-sized graphs (up to several thousand nodes)
 - Transaction flow visualization focuses on recent blocks (e.g., last 5-10 blocks) to maintain performance
-- Users can configure time windows for clustering (e.g., last 20-50 blocks) within reasonable limits
-- Analytics calculations are performed synchronously and update the visualization when complete
+- Clustering uses default time window of last 30 blocks (configurable range: 20-50 blocks) for optimal balance of coverage and performance
+- Analytics calculations are performed synchronously and update the visualization when complete, with loading indicators shown during calculation periods (typically 2-3 seconds)
 - The system can handle datasets with varying activity levels (some blocks/transactions much more active than others)
 
 ## Dependencies

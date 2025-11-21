@@ -1,0 +1,605 @@
+openapi: 3.0.3
+info:
+  title: Graph Analytics API
+  description: |
+    REST API extensions for graph analytics functionality.
+    Extends the base Cardano Graph Visualization API with analytics endpoints
+    for node degree metrics, color coding, anomaly detection, clustering, and flow visualization.
+  version: 1.0.0
+  contact:
+    name: Graph Chain Project
+
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+  - url: http://127.0.0.1:5000
+    description: Alternative local server
+
+paths:
+  /api/analytics/degrees:
+    get:
+      summary: Get node degree metrics
+      description: |
+        Returns degree metrics (in-degree, out-degree, total degree, type-specific degree)
+        for all nodes or filtered by node type.
+      operationId: getNodeDegrees
+      tags:
+        - Analytics
+      parameters:
+        - name: node_type
+          in: query
+          description: Filter by node type (block, transaction, address)
+          required: false
+          schema:
+            type: string
+            enum: [block, transaction, address]
+        - name: node_id
+          in: query
+          description: Get degree for specific node ID
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Node degree metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DegreeMetricsResponse'
+        '404':
+          description: Node not found (when node_id specified)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/analytics/activity:
+    get:
+      summary: Get activity metrics and color mappings
+      description: |
+        Returns normalized activity scores (0-100) and color mappings for nodes.
+        Activity metrics are calculated based on node type (transaction count for blocks,
+        input/output count for transactions, UTxO count for addresses).
+      operationId: getActivityMetrics
+      tags:
+        - Analytics
+      parameters:
+        - name: node_type
+          in: query
+          description: Filter by node type
+          required: false
+          schema:
+            type: string
+            enum: [block, transaction, address]
+        - name: color_scheme
+          in: query
+          description: Color scheme to use (heatmap, activity, grayscale)
+          required: false
+          schema:
+            type: string
+            enum: [heatmap, activity, grayscale]
+            default: heatmap
+      responses:
+        '200':
+          description: Activity metrics and color mappings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityMetricsResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/analytics/anomalies:
+    get:
+      summary: Detect anomalies in loaded data
+      description: |
+        Identifies anomalous nodes (blocks with unusually high transaction counts,
+        transactions with unusually large values) using statistical methods.
+        Requires minimum 10 nodes in dataset for statistical validity.
+      operationId: detectAnomalies
+      tags:
+        - Analytics
+      parameters:
+        - name: node_type
+          in: query
+          description: Filter by node type (block, transaction)
+          required: false
+          schema:
+            type: string
+            enum: [block, transaction]
+        - name: method
+          in: query
+          description: Detection method (zscore, percentile, threshold)
+          required: false
+          schema:
+            type: string
+            enum: [zscore, percentile, threshold]
+            default: percentile
+        - name: threshold
+          in: query
+          description: Threshold multiplier for threshold method (e.g., 2.0 for 2x average)
+          required: false
+          schema:
+            type: number
+            default: 2.0
+      responses:
+        '200':
+          description: Anomaly detection results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnomalyDetectionResponse'
+        '400':
+          description: Insufficient data for anomaly detection (less than 10 nodes)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/analytics/clusters:
+    get:
+      summary: Perform clustering analysis
+      description: |
+        Identifies clusters of addresses or transactions that frequently interact
+        within a specified time window (default: last 30 blocks, configurable: 20-50 blocks).
+        Uses NetworkX community detection algorithms.
+      operationId: getClusters
+      tags:
+        - Analytics
+      parameters:
+        - name: cluster_type
+          in: query
+          description: Type of clustering (address, transaction)
+          required: true
+          schema:
+            type: string
+            enum: [address, transaction]
+        - name: time_window_blocks
+          in: query
+          description: Number of recent blocks to analyze (20-50)
+          required: false
+          schema:
+            type: integer
+            minimum: 20
+            maximum: 50
+            default: 30
+      responses:
+        '200':
+          description: Cluster assignments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/analytics/flow:
+    get:
+      summary: Get transaction flow paths
+      description: |
+        Returns transaction flow paths showing value movement from input addresses
+        through transactions to output addresses. Paths are limited to recent blocks
+        (last 5-10 blocks) and maximum depth (5-10 hops) for performance.
+      operationId: getFlowPaths
+      tags:
+        - Analytics
+      parameters:
+        - name: start_address
+          in: query
+          description: Starting address node ID (optional, returns all flows if not specified)
+          required: false
+          schema:
+            type: string
+        - name: transaction_id
+          in: query
+          description: Transaction node ID to show flows for (click interaction)
+          required: false
+          schema:
+            type: string
+        - name: max_depth
+          in: query
+          description: Maximum path depth (hops)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 5
+        - name: max_blocks
+          in: query
+          description: Maximum number of recent blocks to analyze
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 5
+      responses:
+        '200':
+          description: Transaction flow paths
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlowPathsResponse'
+        '404':
+          description: Node not found (when start_address or transaction_id specified)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/analytics/recalculate:
+    post:
+      summary: Recalculate analytics metrics
+      description: |
+        Forces recalculation of all analytics metrics. Useful after loading new data
+        or when metrics appear stale. Returns immediately, calculations happen asynchronously.
+      operationId: recalculateAnalytics
+      tags:
+        - Analytics
+      responses:
+        '202':
+          description: Recalculation started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "recalculating"
+                  message:
+                    type: string
+                    example: "Analytics recalculation started"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    DegreeMetricsResponse:
+      type: object
+      required:
+        - metrics
+      properties:
+        metrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/DegreeMetric'
+        statistics:
+          type: object
+          properties:
+            total_nodes:
+              type: integer
+            nodes_by_type:
+              type: object
+              additionalProperties:
+                type: integer
+
+    DegreeMetric:
+      type: object
+      required:
+        - node_id
+        - node_type
+        - in_degree
+        - out_degree
+        - total_degree
+        - type_degree
+      properties:
+        node_id:
+          type: string
+          example: "block_abc123"
+        node_type:
+          type: string
+          enum: [block, transaction, address]
+        in_degree:
+          type: integer
+          description: Number of incoming edges
+          example: 5
+        out_degree:
+          type: integer
+          description: Number of outgoing edges
+          example: 10
+        total_degree:
+          type: integer
+          description: Total edges (in + out)
+          example: 15
+        type_degree:
+          type: integer
+          description: Type-specific degree (tx count for blocks, input/output count for transactions, UTxO count for addresses)
+          example: 10
+
+    ActivityMetricsResponse:
+      type: object
+      required:
+        - metrics
+      properties:
+        metrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivityMetric'
+        color_scheme:
+          type: string
+          enum: [heatmap, activity, grayscale]
+        normalization_stats:
+          type: object
+          properties:
+            min_value:
+              type: number
+            max_value:
+              type: number
+            mean_value:
+              type: number
+
+    ActivityMetric:
+      type: object
+      required:
+        - node_id
+        - node_type
+        - raw_value
+        - normalized_value
+        - color_hex
+      properties:
+        node_id:
+          type: string
+        node_type:
+          type: string
+          enum: [block, transaction, address]
+        metric_type:
+          type: string
+          enum: [block_tx_count, tx_input_output_count, address_utxo_count]
+        raw_value:
+          type: integer
+          description: Original unnormalized value
+          example: 25
+        normalized_value:
+          type: number
+          description: Normalized value (0-100)
+          example: 75.5
+        color_hex:
+          type: string
+          description: Hex color code for visualization
+          example: "#FFA500"
+        color_hsl:
+          type: object
+          properties:
+            hue:
+              type: number
+            saturation:
+              type: number
+            lightness:
+              type: number
+
+    AnomalyDetectionResponse:
+      type: object
+      required:
+        - anomalies
+        - method
+        - statistics
+      properties:
+        anomalies:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnomalyResult'
+        method:
+          type: string
+          enum: [zscore, percentile, threshold]
+        statistics:
+          type: object
+          properties:
+            mean:
+              type: number
+            std:
+              type: number
+            percentile_5:
+              type: number
+            percentile_95:
+              type: number
+            threshold_value:
+              type: number
+        total_nodes_analyzed:
+          type: integer
+
+    AnomalyResult:
+      type: object
+      required:
+        - node_id
+        - node_type
+        - is_anomaly
+        - anomaly_score
+        - anomaly_type
+        - actual_value
+      properties:
+        node_id:
+          type: string
+        node_type:
+          type: string
+          enum: [block, transaction]
+        is_anomaly:
+          type: boolean
+        anomaly_score:
+          type: number
+          description: Anomaly score (0-100, higher = more anomalous)
+          example: 85.5
+        anomaly_type:
+          type: string
+          enum: [high_transaction_count, high_transaction_value]
+        detection_method:
+          type: string
+        actual_value:
+          type: number
+        threshold_value:
+          type: number
+
+    ClusterResponse:
+      type: object
+      required:
+        - clusters
+        - cluster_type
+        - time_window_blocks
+      properties:
+        clusters:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cluster'
+        cluster_type:
+          type: string
+          enum: [address, transaction]
+        time_window_blocks:
+          type: integer
+        total_clusters:
+          type: integer
+        nodes_clustered:
+          type: integer
+
+    Cluster:
+      type: object
+      required:
+        - cluster_id
+        - node_ids
+        - size
+        - color_hex
+      properties:
+        cluster_id:
+          type: integer
+          description: Unique cluster identifier
+          example: 0
+        node_ids:
+          type: array
+          items:
+            type: string
+          description: Node IDs belonging to this cluster
+        size:
+          type: integer
+          description: Number of nodes in cluster
+          example: 5
+        color_hex:
+          type: string
+          description: Color assigned to cluster for visualization
+          example: "#FF5733"
+
+    FlowPathsResponse:
+      type: object
+      required:
+        - paths
+      properties:
+        paths:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlowPath'
+        total_paths:
+          type: integer
+        max_depth:
+          type: integer
+        blocks_analyzed:
+          type: integer
+
+    FlowPath:
+      type: object
+      required:
+        - path_id
+        - path_nodes
+        - path_edges
+        - total_value
+        - path_length
+      properties:
+        path_id:
+          type: string
+          example: "flow_abc123"
+        start_address:
+          type: string
+          description: Starting address node ID
+        end_address:
+          type: string
+          description: Ending address node ID (if path completes)
+          nullable: true
+        path_nodes:
+          type: array
+          items:
+            type: string
+          description: Ordered list of node IDs in path
+        path_edges:
+          type: array
+          items:
+            type: object
+            properties:
+              from:
+                type: string
+              to:
+                type: string
+              value:
+                type: integer
+          description: Edges in path with values
+        total_value:
+          type: integer
+          description: Total value (Lovelace) flowing through path
+          example: 1000000
+        path_length:
+          type: integer
+          description: Number of hops in path
+          example: 3
+        is_complete:
+          type: boolean
+          description: Whether path reaches an output address
+        block_range:
+          type: object
+          properties:
+            min_block_height:
+              type: integer
+            max_block_height:
+              type: integer
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type/code
+          example: "INSUFFICIENT_DATA"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Anomaly detection requires at least 10 nodes"
+        details:
+          type: object
+          description: Additional error details
+          additionalProperties: true
+

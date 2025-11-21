@@ -7,49 +7,44 @@
 
 ## Summary
 
-Add lightweight, local graph analytics capabilities to the Cardano blockchain visualization system. Analytics will operate on the loaded data subset and include: node degree calculations (block/transaction/address), color coding based on activity metrics, anomaly detection for unusual transactions/blocks, simple clustering for related addresses/transactions, and transaction flow visualization. All calculations performed locally using NetworkX graph algorithms, with visual feedback through color gradients and highlighting.
+Add lightweight graph analytics capabilities to the existing Cardano blockchain visualization system. Analytics operate locally on the loaded data subset using NetworkX algorithms. Features include: node degree calculation (block/transaction/address), color-coded activity visualization (heatmap scheme), percentile-based anomaly detection, community clustering for addresses/transactions, and transaction flow path visualization. Implementation extends the existing `GraphBuilder` with an `AnalyticsEngine` class that computes metrics incrementally, caches results, and provides API endpoints for querying analytics. Uses NetworkX built-in algorithms (degree methods, community detection, path finding) and HSL color space for activity visualization. No new dependencies required.
 
 ## Technical Context
 
-**Language/Version**: Python 3.13  
-**Primary Dependencies**: Flask 3.0+, NetworkX 3.0+, PyVis 0.3.2+, blockfrost-python 0.6.0+, pytest 7.4+  
-**Storage**: In-memory (NetworkX DiGraph), no persistent storage required  
-**Testing**: pytest with pytest-asyncio for async tests  
-**Target Platform**: Web application (Flask backend + static HTML/JS frontend)  
-**Project Type**: Web application (single project with backend API and frontend visualization)  
-**Performance Goals**: Analytics calculations complete within 2 seconds for datasets up to 1000 nodes (SC-008)  
-**Constraints**: 
-  - Local analytics only (operates on loaded data subset, no external API calls for analytics)
-  - Must update automatically when new data is loaded (within 3 seconds per SC-009)
-  - Memory-efficient (current MAX_NODES=30, but should scale to 1000 nodes)
-  - Synchronous calculation model (no async analytics processing)
-**Scale/Scope**: 
-  - Graph size: Up to 1000 nodes (blocks, transactions, addresses)
-  - Time window: Last 20-50 blocks for clustering (configurable)
-  - Recent blocks: Last 5-10 blocks for flow visualization
-  - Analytics features: 5 core capabilities (degree metrics, color coding, anomaly detection, clustering, flow visualization)
+**Language/Version**: Python 3.10+ (matches existing project)  
+**Primary Dependencies**: NetworkX 3.0+ (graph algorithms), Flask 3.x (API endpoints), NumPy (statistical calculations - optional enhancement)  
+**Storage**: In-memory analytics metrics stored as NetworkX node/edge attributes (no persistent storage)  
+**Testing**: pytest with Flask test client, unittest.mock for analytics calculations, integration tests for API endpoints  
+**Target Platform**: Cross-platform (Linux/macOS/Windows), modern web browser for visualization  
+**Project Type**: web (extends existing Flask backend + browser frontend)  
+**Performance Goals**: Analytics calculations complete within 2 seconds for datasets up to 1000 nodes, degree calculation < 10ms for 1000 nodes, color coding < 50ms for 1000 nodes, anomaly detection < 100ms for 1000 nodes, clustering < 500ms for 500 nodes  
+**Constraints**: Analytics operate only on loaded data subset (not historical data), minimum 10 nodes required for statistical anomaly detection, clustering limited to recent blocks (20-50 block window), flow paths limited to max_depth=5-10 hops  
+**Scale/Scope**: Supports datasets up to 1000 nodes, single user, operates on loaded blockchain data subset
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-**Note**: Constitution file appears to be a template. Proceeding with standard development practices:
-- Test-first development (pytest)
-- Integration tests for API endpoints
-- Code review and quality gates
-- Simplicity and YAGNI principles
+**Note**: Constitution file at `.specify/memory/constitution.md` appears to be a template. No specific gates can be evaluated until constitution is defined. Proceeding with plan assuming standard development practices.
+
+**Gates to evaluate** (once constitution is defined):
+- [ ] Technology stack compliance (using existing NetworkX/Flask stack)
+- [ ] Architecture simplicity requirements (extending existing GraphBuilder vs new service)
+- [ ] Testing requirements (unit tests for analytics calculations, integration tests for API)
+- [ ] Documentation requirements (API contracts, quickstart guide)
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-specs/[###-feature]/
+specs/002-graph-analytics/
 ├── plan.md              # This file (/speckit.plan command output)
 ├── research.md          # Phase 0 output (/speckit.plan command)
 ├── data-model.md        # Phase 1 output (/speckit.plan command)
 ├── quickstart.md        # Phase 1 output (/speckit.plan command)
 ├── contracts/           # Phase 1 output (/speckit.plan command)
+│   └── api.yaml         # OpenAPI specification for analytics endpoints
 └── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
 ```
 
@@ -57,33 +52,25 @@ specs/[###-feature]/
 
 ```text
 src/
-├── models/              # Data models (Block, Transaction, Address)
-│   ├── __init__.py
-│   ├── block.py
-│   ├── transaction.py
-│   └── address.py
-├── api/                 # API client (Blockfrost)
-│   └── blockfrost_client.py
-├── graph_builder.py     # NetworkX graph management (existing)
-├── data_fetcher.py      # Data polling and fetching (existing)
-├── web_server.py        # Flask API server (existing)
-├── analytics.py         # NEW: Analytics engine for calculations
-└── config.py            # Configuration management
+├── graph_builder.py     # Existing: Graph structure management (extends with analytics)
+├── analytics_engine.py  # NEW: Analytics calculations (degree, color, anomaly, clustering, flow)
+├── web_server.py        # Existing: Flask app (extends with analytics API endpoints)
+├── data_fetcher.py      # Existing: Data ingestion
+└── models/              # Existing: Block, Transaction, Address models
 
 static/
-└── index.html           # Frontend visualization (PyVis)
+└── index.html           # Existing: Frontend visualization (extends with analytics UI)
 
 tests/
 ├── unit/
-│   ├── test_data_fetcher.py
-│   ├── test_graph_builder.py
-│   ├── test_web_server.py
-│   └── test_analytics.py        # NEW: Analytics unit tests
+│   ├── test_graph_builder.py      # Existing
+│   ├── test_analytics_engine.py   # NEW: Analytics calculation tests
+│   └── test_web_server.py          # Existing (extends with analytics endpoint tests)
 └── integration/
-    └── test_end_to_end.py
+    └── test_end_to_end.py         # Existing (extends with analytics integration tests)
 ```
 
-**Structure Decision**: Single web application project. Analytics functionality will be added as a new `analytics.py` module that extends `GraphBuilder` capabilities. Analytics calculations will be integrated into the existing graph update flow and exposed via new API endpoints. Frontend will consume analytics data through existing `/api/graph` endpoint with enhanced node/edge metadata.
+**Structure Decision**: Extends existing single-project structure. New `analytics_engine.py` module wraps/extends `GraphBuilder` to provide analytics functionality. Analytics API endpoints added to existing `web_server.py`. Frontend `index.html` extended with analytics visualization controls. Tests follow existing unit/integration structure.
 
 ## Complexity Tracking
 

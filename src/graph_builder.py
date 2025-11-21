@@ -16,10 +16,15 @@ class GraphBuilder:
         self.graph = nx.DiGraph()
         self.last_update: Optional[datetime] = None
         self._update_callbacks: List[Callable] = []
+        # Track block sequence for chain visualization
+        self.block_heights: Dict[int, str] = {}  # height -> block_id mapping
+        self.block_sequence: List[str] = []  # Ordered list of block IDs
+        # Track metrics for color-coding
+        self.block_metrics: Dict[str, Dict[str, Any]] = {}  # block_id -> metrics
     
     def add_block(self, block: Block) -> None:
         """
-        Add a block node to the graph.
+        Add a block node to the graph and connect it to its predecessor.
         
         Args:
             block: Block instance to add
@@ -30,18 +35,65 @@ class GraphBuilder:
         
         node_id = f"block_{block.block_hash}"
         
+        # Initialize metrics for this block
+        self.block_metrics[node_id] = {
+            'transaction_count': 0,
+            'total_value': 0,
+            'address_count': 0,
+            'activity_score': 0,
+        }
+        
         # Add block node if not already present
         if not self.graph.has_node(node_id):
             # Double-check limit before adding
             if len(self.graph.nodes()) >= MAX_NODES:
                 return
+            
+            # Calculate initial activity score based on tx_count
+            activity_score = min(block.tx_count or 0, 100)  # Normalize to 0-100
+            
             self.graph.add_node(
                 node_id,
                 type='block',
                 data=block.to_dict(),
                 label=f"Block {block.block_height}",
+                height=block.block_height,
+                tx_count=block.tx_count or 0,
+                activity_score=activity_score,
+                level=0,  # Block level for hierarchical layout
             )
-            self._emit_update('node_added', node={'id': node_id, 'type': 'block', 'data': block.to_dict()})
+            
+            # Track block sequence
+            self.block_heights[block.block_height] = node_id
+            if node_id not in self.block_sequence:
+                self.block_sequence.append(node_id)
+                self.block_sequence.sort(key=lambda bid: self.graph.nodes[bid].get('height', 0))
+            
+            # Connect to previous block if exists
+            prev_height = block.block_height - 1
+            if prev_height in self.block_heights:
+                prev_block_id = self.block_heights[prev_height]
+                if not self.graph.has_edge(prev_block_id, node_id):
+                    self.graph.add_edge(
+                        prev_block_id,
+                        node_id,
+                        type='chain',
+                        label='prev',
+                        weight=1,
+                    )
+                    self._emit_update('edge_added', edge={
+                        'from': prev_block_id,
+                        'to': node_id,
+                        'type': 'chain'
+                    })
+            
+            self._emit_update('node_added', node={
+                'id': node_id,
+                'type': 'block',
+                'data': block.to_dict(),
+                'height': block.block_height,
+                'activity_score': activity_score
+            })
         
         self.last_update = datetime.now()
     
@@ -83,6 +135,22 @@ class GraphBuilder:
                     label='contains',
                 )
                 self._emit_update('edge_added', edge={'from': block_id, 'to': tx_id, 'type': 'block_tx'})
+                
+                # Update block metrics
+                if block_id in self.block_metrics:
+                    self.block_metrics[block_id]['transaction_count'] += 1
+                    # Update activity score
+                    tx_value = sum(out.amount for out in transaction.outputs)
+                    self.block_metrics[block_id]['total_value'] += tx_value
+                    self.block_metrics[block_id]['activity_score'] = min(
+                        self.block_metrics[block_id]['transaction_count'] * 10 +
+                        min(self.block_metrics[block_id]['total_value'] / 1000000, 50),  # Normalize
+                        100
+                    )
+                    # Update node with new metrics
+                    if self.graph.has_node(block_id):
+                        self.graph.nodes[block_id]['tx_count'] = self.block_metrics[block_id]['transaction_count']
+                        self.graph.nodes[block_id]['activity_score'] = self.block_metrics[block_id]['activity_score']
         
         # Connect ALL input addresses to transaction (enhanced for T027)
         for inp in transaction.inputs:
@@ -94,6 +162,10 @@ class GraphBuilder:
                     from src.models import Address
                     addr = Address(address=inp.address, first_seen=transaction.timestamp)
                     self.add_address(addr)
+                    # Update block metrics
+                    block_id = f"block_{transaction.block_hash}"
+                    if block_id in self.block_metrics:
+                        self.block_metrics[block_id]['address_count'] += 1
                 
                 edge_id = (addr_id, tx_id)
                 if not self.graph.has_edge(*edge_id):
@@ -116,6 +188,10 @@ class GraphBuilder:
                 addr = Address(address=out.address, first_seen=transaction.timestamp)
                 addr.update_stats(received=out.amount)
                 self.add_address(addr)
+                # Update block metrics
+                block_id = f"block_{transaction.block_hash}"
+                if block_id in self.block_metrics:
+                    self.block_metrics[block_id]['address_count'] += 1
             
             edge_id = (tx_id, addr_id)
             if not self.graph.has_edge(*edge_id):
@@ -220,14 +296,23 @@ class GraphBuilder:
         nodes = []
         edges = []
         
-        # Convert nodes
+        # Convert nodes with enhanced metadata
         for node_id, data in self.graph.nodes(data=True):
+            node_type = data.get('type', 'unknown')
             node_data = {
                 'id': node_id,
                 'label': data.get('label', node_id),
-                'type': data.get('type', 'unknown'),
+                'type': node_type,
                 'data': data.get('data', {}),
+                'level': data.get('level', 1 if node_type == 'transaction' else 0),
+                'height': data.get('height'),
+                'tx_count': data.get('tx_count', 0),
+                'activity_score': data.get('activity_score', 0),
             }
+            # Add metrics if available
+            if node_id in self.block_metrics:
+                metrics = self.block_metrics[node_id]
+                node_data['metrics'] = metrics
             nodes.append(node_data)
         
         # Convert edges
@@ -246,23 +331,69 @@ class GraphBuilder:
             'edges': edges,
         }
     
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self, max_blocks: Optional[int] = None) -> Dict[str, Any]:
         """
         Convert graph to JSON-compatible format for API responses.
+        
+        Args:
+            max_blocks: Maximum number of recent blocks to include (None for all)
         
         Returns:
             Dictionary with nodes, edges, and metadata
         """
         graph_data = self.to_pyvis()
         
+        # If max_blocks is specified, filter to show only recent blocks and their connections
+        if max_blocks and len(self.block_sequence) > max_blocks:
+            # Keep only the most recent blocks
+            recent_blocks = set(self.block_sequence[-max_blocks:])
+            
+            # Filter nodes: keep blocks in recent set, and their connected transactions/addresses
+            filtered_nodes = []
+            filtered_node_ids = set()
+            
+            for node in graph_data['nodes']:
+                node_id = node['id']
+                node_type = node.get('type', 'unknown')
+                
+                if node_type == 'block':
+                    if node_id in recent_blocks:
+                        filtered_nodes.append(node)
+                        filtered_node_ids.add(node_id)
+                else:
+                    # For transactions and addresses, check if connected to recent blocks
+                    # This will be handled by edge filtering
+                    pass
+            
+            # Add transactions and addresses connected to recent blocks
+            for edge in graph_data['edges']:
+                from_id = edge['from']
+                to_id = edge['to']
+                
+                # If edge connects to a recent block, include both nodes
+                if from_id in filtered_node_ids or to_id in filtered_node_ids:
+                    filtered_node_ids.add(from_id)
+                    filtered_node_ids.add(to_id)
+            
+            # Now add all nodes that are in filtered_node_ids
+            filtered_nodes = [n for n in graph_data['nodes'] if n['id'] in filtered_node_ids]
+            filtered_edges = [e for e in graph_data['edges'] 
+                            if e['from'] in filtered_node_ids and e['to'] in filtered_node_ids]
+            
+            graph_data = {
+                'nodes': filtered_nodes,
+                'edges': filtered_edges
+            }
+        
         return {
             'nodes': graph_data['nodes'],
             'edges': graph_data['edges'],
             'metadata': {
-                'node_count': len(self.graph.nodes()),
-                'edge_count': len(self.graph.edges()),
+                'node_count': len(graph_data['nodes']),
+                'edge_count': len(graph_data['edges']),
                 'latest_block_height': self._get_latest_block_height(),
                 'last_update': self.last_update.isoformat() if self.last_update else None,
+                'block_sequence_length': len(self.block_sequence),
             }
         }
     

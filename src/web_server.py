@@ -76,7 +76,9 @@ def index():
 def get_graph():
     """Get current graph state as JSON."""
     try:
-        graph_data = graph_builder.to_json()
+        # Get max_blocks parameter for dynamic collapsing
+        max_blocks = request.args.get('max_blocks', type=int)
+        graph_data = graph_builder.to_json(max_blocks=max_blocks)
         return jsonify(graph_data)
     except Exception as e:
         logger.error(f"Error getting graph: {e}")

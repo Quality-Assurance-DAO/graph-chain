@@ -212,6 +212,15 @@
             <span class="info-value" id="latest-block">-</span>
         </div>
         <div class="info-item">
+            <span class="info-label">Zoom Level:</span>
+            <span class="info-value" id="zoom-level">Block View</span>
+        </div>
+        <div class="info-item">
+            <button onclick="toggleZoomLevel()" style="width: 100%; padding: 5px; background-color: #00d4ff; border: none; border-radius: 3px; color: #1a1a1a; cursor: pointer; font-weight: bold;">
+                Switch to Transaction View
+            </button>
+        </div>
+        <div class="info-item">
             <span class="info-label">Last Update:</span>
             <span class="info-value" id="last-update">-</span>
         </div>
@@ -237,6 +246,49 @@
         
         const container = document.getElementById('graph-container');
         const data = { nodes: nodes, edges: edges };
+        
+        // Zoom level state
+        let currentZoomLevel = 'block'; // 'block' or 'transaction'
+        let visibleBlocks = new Set();
+        let collapsedBlocks = new Set();
+        const MAX_VISIBLE_BLOCKS = 30;
+        
+        // Color coding functions
+        function getNodeColor(node) {
+            const type = node.type || 'unknown';
+            const activityScore = node.activity_score || 0;
+            
+            if (type === 'block') {
+                // Color blocks by activity: low (blue) -> medium (yellow) -> high (red)
+                if (activityScore < 30) {
+                    return { background: '#4a90e2', border: '#2e5c8a', highlight: { background: '#6ba3f0', border: '#4a90e2' } };
+                } else if (activityScore < 70) {
+                    return { background: '#f5a623', border: '#d68910', highlight: { background: '#ffb84d', border: '#f5a623' } };
+                } else {
+                    return { background: '#e74c3c', border: '#c0392b', highlight: { background: '#ec7063', border: '#e74c3c' } };
+                }
+            } else if (type === 'transaction') {
+                return { background: '#ff6b6b', border: '#cc5555', highlight: { background: '#ff8888', border: '#ff6b6b' } };
+            } else if (type === 'address') {
+                return { background: '#4ecdc4', border: '#3ba89f', highlight: { background: '#6eddd4', border: '#4ecdc4' } };
+            }
+            return { background: '#848484', border: '#666666' };
+        }
+        
+        function getNodeSize(node) {
+            const type = node.type || 'unknown';
+            const activityScore = node.activity_score || 0;
+            
+            if (type === 'block') {
+                // Size based on activity: 25-40 pixels
+                return 25 + (activityScore / 100) * 15;
+            } else if (type === 'transaction') {
+                return 22;
+            } else if (type === 'address') {
+                return 18;
+            }
+            return 16;
+        }
         
         const options = {
             nodes: {
@@ -306,38 +358,111 @@
         });
         
         function updateNodeStyles() {
-            const nodeTypes = {
-                'block': { 
-                    color: { background: '#00d4ff', border: '#0099cc', highlight: { background: '#33ddff', border: '#00d4ff' } },
-                    shape: 'box',
-                    size: 25
-                },
-                'transaction': { 
-                    color: { background: '#ff6b6b', border: '#cc5555', highlight: { background: '#ff8888', border: '#ff6b6b' } },
-                    shape: 'diamond',
-                    size: 22
-                },
-                'address': { 
-                    color: { background: '#4ecdc4', border: '#3ba89f', highlight: { background: '#6eddd4', border: '#4ecdc4' } },
-                    shape: 'dot',
-                    size: 18
-                }
-            };
-            
             nodes.forEach(function(node) {
-                const typeStyle = nodeTypes[node.type] || { 
-                    color: { background: '#848484', border: '#666666' },
-                    shape: 'dot',
-                    size: 16
-                };
+                const nodeData = node;
+                const type = nodeData.type || 'unknown';
+                const color = getNodeColor(nodeData);
+                const size = getNodeSize(nodeData);
+                
+                let shape = 'dot';
+                if (type === 'block') shape = 'box';
+                else if (type === 'transaction') shape = 'diamond';
+                else if (type === 'address') shape = 'dot';
+                
+                // Apply visibility based on zoom level
+                let hidden = false;
+                if (currentZoomLevel === 'block' && type !== 'block' && type !== 'chain') {
+                    // In block view, hide transactions and addresses unless block is expanded
+                    const blockId = findBlockForNode(nodeData.id);
+                    if (blockId && !visibleBlocks.has(blockId)) {
+                        hidden = true;
+                    }
+                }
+                
                 nodes.update({
-                    id: node.id,
-                    color: typeStyle.color,
-                    shape: typeStyle.shape,
-                    size: typeStyle.size
+                    id: nodeData.id,
+                    color: color,
+                    shape: shape,
+                    size: size,
+                    hidden: hidden,
+                    font: {
+                        size: type === 'block' ? 14 : 12,
+                        color: '#ffffff'
+                    }
                 });
             });
         }
+        
+        function findBlockForNode(nodeId) {
+            // Find which block a transaction or address belongs to
+            const node = nodes.get(nodeId);
+            if (!node) return null;
+            
+            if (node.type === 'block') return nodeId;
+            
+            // Check edges to find connected block
+            const nodeEdges = edges.get({
+                filter: function(edge) {
+                    return edge.from === nodeId || edge.to === nodeId;
+                }
+            });
+            
+            for (let edge of nodeEdges) {
+                const otherId = edge.from === nodeId ? edge.to : edge.from;
+                const otherNode = nodes.get(otherId);
+                if (otherNode && otherNode.type === 'block') {
+                    return otherId;
+                }
+            }
+            return null;
+        }
+        
+        function toggleZoomLevel() {
+            currentZoomLevel = currentZoomLevel === 'block' ? 'transaction' : 'block';
+            document.getElementById('zoom-level').textContent = 
+                currentZoomLevel === 'block' ? 'Block View' : 'Transaction View';
+            
+            const button = event.target;
+            button.textContent = currentZoomLevel === 'block' 
+                ? 'Switch to Transaction View' 
+                : 'Switch to Block View';
+            
+            // Update visibility
+            updateNodeStyles();
+            
+            // Smooth transition
+            network.fit({
+                animation: {
+                    duration: 500,
+                    easingFunction: 'easeInOutQuad'
+                }
+            });
+        }
+        
+        // Handle zoom events for dynamic expansion
+        network.on('zoom', function(params) {
+            const scale = params.scale;
+            // When zoomed in enough, show transaction details
+            if (scale > 1.5 && currentZoomLevel === 'block') {
+                // Could auto-expand blocks here
+            }
+        });
+        
+        // Double-click to expand/collapse blocks
+        network.on('doubleClick', function(params) {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                const node = nodes.get(nodeId);
+                if (node && node.type === 'block') {
+                    if (visibleBlocks.has(nodeId)) {
+                        visibleBlocks.delete(nodeId);
+                    } else {
+                        visibleBlocks.add(nodeId);
+                    }
+                    updateNodeStyles();
+                }
+            }
+        });
         
         // Node interaction handlers (T031 - highlight connected nodes)
         let highlightedNodes = new Set();
@@ -417,19 +542,41 @@
                             id: node.id,
                             label: node.label || node.id,
                             type: node.type,
-                            title: JSON.stringify(node.data, null, 2)
+                            title: JSON.stringify(node.data, null, 2),
+                            activity_score: node.activity_score || 0,
+                            height: node.height,
+                            tx_count: node.tx_count || 0,
+                            level: node.level || 0
                         })));
+                        
+                        // Track visible blocks
+                        data.nodes.forEach(node => {
+                            if (node.type === 'block') {
+                                visibleBlocks.add(node.id);
+                            }
+                        });
                         edges.add(data.edges.map(edge => {
                             // Enhanced edge labeling (T030 - show amounts and types)
                             let edgeLabel = edge.label || '';
                             let edgeTitle = `Type: ${edge.type}`;
+                            let edgeWidth = 2;
+                            let edgeColor = '#848484';
                             
-                            if (edge.type === 'tx_output' && edge.weight) {
+                            if (edge.type === 'chain') {
+                                // Chain edges (block to block) are thicker and more prominent
+                                edgeWidth = 4;
+                                edgeColor = '#00d4ff';
+                                edgeLabel = '';
+                                edgeTitle = 'Block Chain';
+                            } else if (edge.type === 'tx_output' && edge.weight) {
                                 edgeTitle += `\nAmount: ${edge.label || edge.weight}`;
+                                edgeWidth = 2;
                             } else if (edge.type === 'tx_input') {
                                 edgeTitle += '\nInput connection';
+                                edgeWidth = 1.5;
                             } else if (edge.type === 'block_tx') {
                                 edgeTitle += '\nBlock contains transaction';
+                                edgeWidth = 2;
                             }
                             
                             return {
@@ -439,15 +586,30 @@
                                 label: edgeLabel,
                                 title: edgeTitle,
                                 type: edge.type,
-                                weight: edge.weight || 1
+                                weight: edge.weight || 1,
+                                width: edgeWidth,
+                                color: { color: edgeColor, highlight: '#00d4ff' }
                             };
                         }));
+                        updateVisibleBlocks();
                         updateNodeStyles();
                         updateStats(data.metadata);
                         
                         // Refresh browse panel if it's open
                         if (document.getElementById('browse-panel').classList.contains('active')) {
                             loadBrowseNodes();
+                        }
+                        
+                        // Auto-fit to show block sequence
+                        if (network && currentZoomLevel === 'block') {
+                            setTimeout(() => {
+                                network.fit({
+                                    animation: {
+                                        duration: 1000,
+                                        easingFunction: 'easeInOutQuad'
+                                    }
+                                });
+                            }, 500);
                         }
                     }
                 })

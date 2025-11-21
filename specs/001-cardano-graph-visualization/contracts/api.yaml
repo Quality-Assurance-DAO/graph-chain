@@ -1,0 +1,307 @@
+openapi: 3.0.3
+info:
+  title: Cardano Graph Visualization API
+  description: |
+    REST API for Cardano blockchain graph visualization system.
+    Provides endpoints for viewing the graph visualization, receiving real-time updates,
+    and checking system status.
+  version: 1.0.0
+  contact:
+    name: Graph Chain Project
+
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+  - url: http://127.0.0.1:5000
+    description: Alternative local server
+
+paths:
+  /:
+    get:
+      summary: Get visualization page
+      description: |
+        Returns the main HTML page with the interactive graph visualization.
+        The page includes embedded JavaScript for real-time graph updates.
+      operationId: getVisualizationPage
+      tags:
+        - Visualization
+      responses:
+        '200':
+          description: HTML page with graph visualization
+          content:
+            text/html:
+              schema:
+                type: string
+                example: "<!DOCTYPE html>..."
+
+  /api/graph:
+    get:
+      summary: Get current graph state
+      description: |
+        Returns the current state of the graph as JSON.
+        Includes all nodes (blocks, transactions, addresses) and edges (relationships).
+        Useful for initial page load or manual refresh.
+      operationId: getGraphState
+      tags:
+        - Graph API
+      responses:
+        '200':
+          description: Current graph state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphState'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/graph/updates:
+    get:
+      summary: Stream graph updates
+      description: |
+        Server-Sent Events (SSE) stream that sends incremental graph updates.
+        Client should connect to this endpoint to receive real-time updates when
+        new blocks, transactions, or addresses are added to the graph.
+      operationId: streamGraphUpdates
+      tags:
+        - Graph API
+      parameters:
+        - name: last_update
+          in: query
+          description: Timestamp of last received update (ISO 8601 format)
+          required: false
+          schema:
+            type: string
+            format: date-time
+            example: "2025-01-27T12:00:00Z"
+      responses:
+        '200':
+          description: SSE stream of graph updates
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: |
+                  event: graph_update
+                  data: {"type":"node_added","node":{"id":"tx_abc123","type":"transaction",...}}
+                  
+                  event: graph_update
+                  data: {"type":"edge_added","edge":{"from":"tx_abc123","to":"addr_bech32_1",...}}
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/status:
+    get:
+      summary: Get system status
+      description: |
+        Returns the current status of the system including:
+        - API connection status
+        - Polling status (active/paused)
+        - Rate limit status
+        - Graph statistics
+        - Last update timestamp
+      operationId: getSystemStatus
+      tags:
+        - Status
+      responses:
+        '200':
+          description: System status information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStatus'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    GraphState:
+      type: object
+      required:
+        - nodes
+        - edges
+        - metadata
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/GraphNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/GraphEdge'
+        metadata:
+          $ref: '#/components/schemas/GraphMetadata'
+
+    GraphNode:
+      type: object
+      required:
+        - id
+        - type
+      properties:
+        id:
+          type: string
+          description: Unique node identifier
+          example: "tx_abc123def456"
+        type:
+          type: string
+          enum: [block, transaction, address]
+          description: Type of node
+        label:
+          type: string
+          description: Display label for the node
+          example: "Block 12345"
+        data:
+          type: object
+          description: Node-specific data (varies by type)
+          additionalProperties: true
+        x:
+          type: number
+          description: X coordinate for visualization (optional)
+        y:
+          type: number
+          description: Y coordinate for visualization (optional)
+
+    GraphEdge:
+      type: object
+      required:
+        - from
+        - to
+        - type
+      properties:
+        from:
+          type: string
+          description: Source node ID
+          example: "tx_abc123"
+        to:
+          type: string
+          description: Target node ID
+          example: "addr_bech32_1"
+        type:
+          type: string
+          enum: [block_tx, tx_input, tx_output]
+          description: Type of edge/relationship
+        weight:
+          type: number
+          description: Edge weight (e.g., transaction amount)
+          example: 1000000
+        label:
+          type: string
+          description: Display label for the edge
+          example: "1000 ADA"
+
+    GraphMetadata:
+      type: object
+      properties:
+        node_count:
+          type: integer
+          description: Total number of nodes in graph
+          example: 150
+        edge_count:
+          type: integer
+          description: Total number of edges in graph
+          example: 300
+        latest_block_height:
+          type: integer
+          description: Highest block height in graph
+          example: 12345
+        last_update:
+          type: string
+          format: date-time
+          description: Timestamp of last graph update
+          example: "2025-01-27T12:00:00Z"
+
+    SystemStatus:
+      type: object
+      required:
+        - status
+        - api_status
+        - polling_status
+      properties:
+        status:
+          type: string
+          enum: [active, paused, error]
+          description: Overall system status
+        api_status:
+          type: string
+          enum: [connected, disconnected, rate_limited]
+          description: Cardano API connection status
+        polling_status:
+          type: string
+          enum: [active, paused, stopped]
+          description: Data polling status
+        rate_limit_status:
+          type: object
+          properties:
+            limited:
+              type: boolean
+              description: Whether currently rate limited
+            retry_after:
+              type: integer
+              description: Seconds until retry allowed (if rate limited)
+        graph_stats:
+          $ref: '#/components/schemas/GraphMetadata'
+        last_block_fetched:
+          type: string
+          format: date-time
+          description: Timestamp of last successfully fetched block
+        polling_interval:
+          type: integer
+          description: Current polling interval in seconds
+          example: 2
+        error_message:
+          type: string
+          description: Error message if status is 'error'
+          nullable: true
+
+    GraphUpdate:
+      type: object
+      required:
+        - type
+        - timestamp
+      properties:
+        type:
+          type: string
+          enum: [node_added, node_updated, edge_added, graph_reset]
+          description: Type of update event
+        timestamp:
+          type: string
+          format: date-time
+          description: When the update occurred
+        node:
+          $ref: '#/components/schemas/GraphNode'
+          description: Node data (if type is node_added or node_updated)
+        edge:
+          $ref: '#/components/schemas/GraphEdge'
+          description: Edge data (if type is edge_added)
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type/code
+          example: "API_ERROR"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Failed to connect to Blockfrost API"
+        details:
+          type: object
+          description: Additional error details
+          additionalProperties: true
+

@@ -6,22 +6,74 @@
     <title>Cardano Blockchain Graph Visualization</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
+        /* CSS Variables for Theme System */
+        :root {
+            /* Dark Theme (default) */
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #3d3d3d;
+            --bg-panel: rgba(45, 45, 45, 0.9);
+            --text-primary: #ffffff;
+            --text-secondary: #aaaaaa;
+            --text-accent: #00d4ff;
+            --border-color: #3d3d3d;
+            --shadow-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        [data-theme="light"] {
+            /* Light Theme */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --bg-tertiary: #e0e0e0;
+            --bg-panel: rgba(245, 245, 245, 0.95);
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --text-accent: #0066cc;
+            --border-color: #cccccc;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
+        
         body {
             margin: 0;
             padding: 0;
             font-family: Arial, sans-serif;
-            background-color: #1a1a1a;
-            color: #ffffff;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         #header {
-            background-color: #2d2d2d;
+            background-color: var(--bg-secondary);
             padding: 15px 20px;
-            border-bottom: 2px solid #3d3d3d;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
         #header h1 {
             margin: 0;
             font-size: 24px;
-            color: #00d4ff;
+            color: var(--text-accent);
+            transition: color 0.3s ease;
+        }
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 10px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 12px;
+            color: var(--text-primary);
+        }
+        .theme-toggle:hover {
+            background-color: var(--bg-secondary);
+        }
+        .theme-toggle-icon {
+            font-size: 16px;
         }
         #status {
             display: inline-block;
@@ -64,29 +116,38 @@
             top: 80px;
             left: 20px;
             width: 350px;
-            background-color: rgba(45, 45, 45, 0.9);
+            background-color: var(--bg-panel);
             padding: 15px;
             border-radius: 5px;
             font-size: 12px;
             max-height: calc(100vh - 100px);
             display: none;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 10px var(--shadow-color);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
         #browse-panel.active {
             display: block;
         }
         #browse-panel h3 {
             margin-top: 0;
-            color: #00d4ff;
+            color: var(--text-accent);
+            transition: color 0.3s ease;
         }
         .search-box {
             width: 100%;
             padding: 8px;
             margin-bottom: 10px;
-            background-color: #1a1a1a;
-            border: 1px solid #3d3d3d;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
             border-radius: 3px;
-            color: #ffffff;
+            color: var(--text-primary);
             font-size: 12px;
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+        .search-box:focus {
+            outline: none;
+            border-color: var(--text-accent);
         }
         .filter-buttons {
             display: flex;
@@ -96,16 +157,21 @@
         .filter-btn {
             flex: 1;
             padding: 5px;
-            background-color: #2d2d2d;
-            border: 1px solid #3d3d3d;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 3px;
-            color: #ffffff;
+            color: var(--text-primary);
             cursor: pointer;
             font-size: 11px;
+            transition: all 0.3s ease;
+        }
+        .filter-btn:hover {
+            background-color: var(--bg-tertiary);
         }
         .filter-btn.active {
-            background-color: #00d4ff;
-            color: #1a1a1a;
+            background-color: var(--text-accent);
+            color: var(--bg-primary);
+            border-color: var(--text-accent);
         }
         .node-list {
             max-height: calc(100vh - 250px);
@@ -114,17 +180,17 @@
         .node-item {
             padding: 8px;
             margin: 5px 0;
-            background-color: #2d2d2d;
-            border-left: 3px solid #00d4ff;
+            background-color: var(--bg-secondary);
+            border-left: 3px solid var(--text-accent);
             border-radius: 3px;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: background-color 0.2s ease;
         }
         .node-item:hover {
-            background-color: #3d3d3d;
+            background-color: var(--bg-tertiary);
         }
         .node-item.block {
-            border-left-color: #00d4ff;
+            border-left-color: var(--text-accent);
         }
         .node-item.transaction {
             border-left-color: #ff6b6b;
@@ -134,29 +200,33 @@
         }
         .node-label {
             font-weight: bold;
-            color: #ffffff;
+            color: var(--text-primary);
             font-size: 12px;
+            transition: color 0.3s ease;
         }
         .node-details {
             font-size: 10px;
-            color: #aaaaaa;
+            color: var(--text-secondary);
             margin-top: 3px;
+            transition: color 0.3s ease;
         }
         .toggle-browse {
             position: absolute;
             top: 80px;
             left: 20px;
             padding: 10px 15px;
-            background-color: rgba(45, 45, 45, 0.9);
-            border: 1px solid #3d3d3d;
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-color);
             border-radius: 5px;
-            color: #00d4ff;
+            color: var(--text-accent);
             cursor: pointer;
             font-size: 12px;
             z-index: 1000;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px var(--shadow-color);
         }
         .toggle-browse:hover {
-            background-color: rgba(45, 45, 45, 1);
+            background-color: var(--bg-secondary);
         }
         #info-panel h3 {
             margin-top: 0;
@@ -165,21 +235,30 @@
         .info-item {
             margin: 10px 0;
             padding: 5px;
-            border-bottom: 1px solid #3d3d3d;
+            border-bottom: 1px solid var(--border-color);
+            transition: border-color 0.3s ease;
         }
         .info-label {
             font-weight: bold;
-            color: #aaaaaa;
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
         }
         .info-value {
-            color: #ffffff;
+            color: var(--text-primary);
+            transition: color 0.3s ease;
         }
     </style>
 </head>
 <body>
     <div id="header">
         <h1>Cardano Blockchain Graph Visualization</h1>
-        <span id="status" class="status-active">Loading...</span>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span id="status" class="status-active">Loading...</span>
+            <div class="theme-toggle" onclick="toggleTheme()" title="Toggle Light/Dark Mode">
+                <span class="theme-toggle-icon" id="theme-icon">🌙</span>
+                <span id="theme-label">Dark</span>
+            </div>
+        </div>
     </div>
     <button class="toggle-browse" onclick="toggleBrowsePanel()">📋 Browse Nodes</button>
     <div id="browse-panel">
@@ -216,7 +295,7 @@
             <span class="info-value" id="zoom-level">Block View</span>
         </div>
         <div class="info-item">
-            <button id="zoom-toggle-btn" onclick="toggleZoomLevel(event)" style="width: 100%; padding: 5px; background-color: #00d4ff; border: none; border-radius: 3px; color: #1a1a1a; cursor: pointer; font-weight: bold;">
+            <button id="zoom-toggle-btn" onclick="toggleZoomLevel(event)" style="width: 100%; padding: 5px; background-color: var(--text-accent); border: none; border-radius: 3px; color: var(--bg-primary); cursor: pointer; font-weight: bold; transition: all 0.3s ease;">
                 Switch to Transaction View
             </button>
         </div>
@@ -239,6 +318,71 @@
     </div>
 
     <script>
+        // Theme Management
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            setTheme(savedTheme);
+        }
+        
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            
+            const icon = document.getElementById('theme-icon');
+            const label = document.getElementById('theme-label');
+            
+            if (icon && label) {
+                if (theme === 'light') {
+                    icon.textContent = '☀️';
+                    label.textContent = 'Light';
+                } else {
+                    icon.textContent = '🌙';
+                    label.textContent = 'Dark';
+                }
+            }
+            
+            // Update graph visualization colors
+            updateGraphTheme(theme);
+        }
+        
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setTheme(newTheme);
+        }
+        
+        function updateGraphTheme(theme) {
+            if (!network || !nodes) return;
+            
+            const isLight = theme === 'light';
+            
+            // Update node colors based on theme
+            nodes.forEach(function(node) {
+                const nodeData = node;
+                const type = nodeData.type || 'unknown';
+                let color = getNodeColor(nodeData, isLight);
+                
+                nodes.update({
+                    id: nodeData.id,
+                    color: color
+                });
+            });
+            
+            // Update edge colors
+            if (edges) {
+                edges.forEach(function(edge) {
+                    const edgeColor = isLight ? '#666666' : '#848484';
+                    edges.update({
+                        id: edge.id,
+                        color: { color: edgeColor, highlight: '#00d4ff' }
+                    });
+                });
+            }
+        }
+        
+        // Initialize theme on page load
+        initTheme();
+        
         // Initialize network
         let network = null;
         let nodes = new vis.DataSet([]);
@@ -296,7 +440,7 @@
                 size: 20,
                 font: {
                     size: 12,
-                    color: '#ffffff',
+                    color: 'var(--text-primary)',
                     face: 'Arial'
                 },
                 borderWidth: 2,
@@ -358,10 +502,13 @@
         });
         
         function updateNodeStyles() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const isLight = currentTheme === 'light';
+            
             nodes.forEach(function(node) {
                 const nodeData = node;
                 const type = nodeData.type || 'unknown';
-                const color = getNodeColor(nodeData);
+                const color = getNodeColor(nodeData, isLight);
                 const size = getNodeSize(nodeData);
                 
                 let shape = 'dot';
@@ -387,7 +534,7 @@
                     hidden: hidden,
                     font: {
                         size: type === 'block' ? 14 : 12,
-                        color: '#ffffff'
+                        color: 'var(--text-primary)'
                     }
                 });
             });
@@ -796,30 +943,88 @@
         
         // Handle graph update events
         function handleGraphUpdate(update) {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const isLight = currentTheme === 'light';
+            
             if (update.type === 'node_added' && update.node) {
                 const node = update.node;
-                nodes.add({
+                const nodeData = {
                     id: node.id,
-                    label: node.data.label || node.id,
+                    label: node.label || node.data.label || node.id,
                     type: node.type,
-                    title: JSON.stringify(node.data, null, 2)
+                    title: JSON.stringify(node.data, null, 2),
+                    activity_score: node.activity_score || 0,
+                    height: node.height,
+                    tx_count: node.tx_count || 0
+                };
+                
+                // Animate new node appearance
+                nodes.add({
+                    ...nodeData,
+                    opacity: 0,
+                    size: 0
                 });
+                
+                // Animate to full visibility
+                setTimeout(() => {
+                    nodes.update({
+                        id: node.id,
+                        opacity: 1,
+                        size: getNodeSize(nodeData),
+                        color: getNodeColor(nodeData, isLight)
+                    });
+                }, 50);
+                
+                // If it's a block, add to visible set
+                if (node.type === 'block') {
+                    visibleBlocks.add(node.id);
+                }
+                
                 updateNodeStyles();
+                
+                // Animate camera to new block if it's a block node
+                if (node.type === 'block' && network) {
+                    setTimeout(() => {
+                        network.focus(node.id, {
+                            animation: {
+                                duration: 800,
+                                easingFunction: 'easeInOutQuad'
+                            },
+                            scale: 1.2
+                        });
+                    }, 200);
+                }
             } else if (update.type === 'edge_added' && update.edge) {
                 const edge = update.edge;
                 let edgeTitle = `Type: ${edge.type}`;
                 if (edge.type === 'tx_output' && edge.weight) {
                     edgeTitle += `\nAmount: ${edge.label || edge.weight}`;
                 }
-                edges.add({
+                
+                const edgeColor = isLight ? '#666666' : '#848484';
+                const edgeData = {
                     id: edge.from + '-' + edge.to,
                     from: edge.from,
                     to: edge.to,
                     label: edge.label || '',
                     title: edgeTitle,
                     type: edge.type,
-                    weight: edge.weight || 1
-                });
+                    weight: edge.weight || 1,
+                    opacity: 0,
+                    width: 0,
+                    color: { color: edgeColor, highlight: '#00d4ff' }
+                };
+                
+                edges.add(edgeData);
+                
+                // Animate edge appearance
+                setTimeout(() => {
+                    edges.update({
+                        id: edgeData.id,
+                        opacity: 1,
+                        width: edge.type === 'chain' ? 3 : 2
+                    });
+                }, 100);
             }
             
             // Refresh stats periodically

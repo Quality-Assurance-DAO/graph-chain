@@ -405,6 +405,14 @@
                         <li><strong>Addresses:</strong> Color shows UTxO count</li>
                     </ul>
                 </div>
+                <div style="margin-bottom: 8px;">
+                    <strong style="color: var(--text-accent);">Anomalies:</strong>
+                    <ul style="margin: 5px 0 0 15px; padding: 0;">
+                        <li>Anomalous nodes highlighted with thick red border</li>
+                        <li>Requires at least 10 nodes for detection</li>
+                        <li>Flags unusually large transactions or high-activity blocks</li>
+                    </ul>
+                </div>
                 <div>
                     <strong style="color: var(--text-accent);">Tips:</strong>
                     <ul style="margin: 5px 0 0 15px; padding: 0;">
@@ -425,6 +433,12 @@
                 <option value="grayscale">Grayscale</option>
             </select>
             <div id="color-scheme-description" style="display: none; margin-top: 3px; padding: 5px; background-color: var(--bg-secondary); border-radius: 3px; font-size: 9px; color: var(--text-secondary); line-height: 1.3;"></div>
+            
+            <label style="display: flex; align-items: center; margin-top: 8px; margin-bottom: 5px; color: var(--text-secondary); font-size: 11px; cursor: pointer;">
+                <input type="checkbox" id="show-anomalies-toggle" checked onchange="toggleAnomalyHighlighting(event)" style="margin-right: 5px; cursor: pointer;">
+                <span>Highlight Anomalies</span>
+                <span id="anomaly-count" style="margin-left: auto; color: var(--text-accent); font-size: 10px; font-weight: bold;"></span>
+            </label>
             
             <button onclick="recalculateAnalytics()" style="width: 100%; margin-top: 5px; padding: 5px; background-color: var(--text-accent); border: none; border-radius: 3px; color: var(--bg-primary); cursor: pointer; font-size: 11px; font-weight: bold;" title="Force recalculation of all analytics metrics. Use after loading new data.">
                 Recalculate Analytics
@@ -515,6 +529,8 @@
         let currentColorScheme = 'heatmap';
         let degreeMetrics = {};
         let activityMetrics = {};
+        let anomalyMetrics = {}; // Store anomaly data by node_id
+        let showAnomalies = true; // Toggle for showing anomaly highlighting
         let isLoadingAnalytics = false;
         let flowPaths = [];
         let highlightedFlowPaths = new Set();
@@ -549,23 +565,44 @@
             const type = node.type || 'unknown';
             const nodeId = node.id;
             
+            // Check if this node is an anomaly
+            const isAnomaly = showAnomalies && anomalyMetrics[nodeId] && anomalyMetrics[nodeId].is_anomaly;
+            const anomalyBorderColor = '#ff0000'; // Red border for anomalies
+            const anomalyBorderWidth = isAnomaly ? 5 : 2; // Thicker border for anomalies
+            
             // Use color from activity metrics API if available
             if (activityMetrics[nodeId] && activityMetrics[nodeId].color_hex) {
                 const colorHex = activityMetrics[nodeId].color_hex;
                 const isLight = isLightColor(colorHex);
                 
+                // Determine border color - use red for anomalies, otherwise theme-based
+                let borderColor;
+                if (isAnomaly) {
+                    borderColor = anomalyBorderColor;
+                } else {
+                    borderColor = isLightTheme ? (isLight ? '#333333' : '#000000') : (isLight ? '#000000' : '#ffffff');
+                }
+                
                 return {
                     background: colorHex,
-                    border: isLightTheme ? (isLight ? '#333333' : '#000000') : (isLight ? '#000000' : '#ffffff'),
+                    border: borderColor,
+                    borderWidth: anomalyBorderWidth,
                     highlight: {
                         background: adjustBrightness(colorHex, 1.2),
-                        border: colorHex
+                        border: isAnomaly ? anomalyBorderColor : colorHex
                     },
                     font: {
                         color: isLight ? '#000000' : '#ffffff',
                         strokeWidth: 2,
                         strokeColor: isLight ? '#ffffff' : '#000000'
-                    }
+                    },
+                    shadow: isAnomaly ? {
+                        enabled: true,
+                        color: 'rgba(255, 0, 0, 0.5)',
+                        size: 10,
+                        x: 0,
+                        y: 0
+                    } : false
                 };
             }
             
@@ -573,33 +610,85 @@
             const activityScore = node.activity_score || 0;
             let colorObj = {};
             
+            // Determine border color and width based on anomaly status
+            let borderColor;
+            let borderWidth = 2;
+            if (isAnomaly) {
+                borderColor = anomalyBorderColor;
+                borderWidth = anomalyBorderWidth;
+            }
+            
             if (type === 'block') {
                 // Color blocks by activity: low (blue) -> medium (yellow) -> high (red)
                 if (isLightTheme) {
                     // Light theme colors (more vibrant)
                     if (activityScore < 30) {
-                        colorObj = { background: '#6ba3f0', border: '#4a90e2', highlight: { background: '#8bb5f5', border: '#6ba3f0' } };
+                        colorObj = { 
+                            background: '#6ba3f0', 
+                            border: isAnomaly ? borderColor : '#4a90e2', 
+                            borderWidth: borderWidth,
+                            highlight: { background: '#8bb5f5', border: isAnomaly ? borderColor : '#6ba3f0' } 
+                        };
                     } else if (activityScore < 70) {
-                        colorObj = { background: '#ffb84d', border: '#f5a623', highlight: { background: '#ffc870', border: '#ffb84d' } };
+                        colorObj = { 
+                            background: '#ffb84d', 
+                            border: isAnomaly ? borderColor : '#f5a623', 
+                            borderWidth: borderWidth,
+                            highlight: { background: '#ffc870', border: isAnomaly ? borderColor : '#ffb84d' } 
+                        };
                     } else {
-                        colorObj = { background: '#ec7063', border: '#e74c3c', highlight: { background: '#f1948a', border: '#ec7063' } };
+                        colorObj = { 
+                            background: '#ec7063', 
+                            border: isAnomaly ? borderColor : '#e74c3c', 
+                            borderWidth: borderWidth,
+                            highlight: { background: '#f1948a', border: isAnomaly ? borderColor : '#ec7063' } 
+                        };
                     }
                 } else {
                     // Dark theme colors (original)
                     if (activityScore < 30) {
-                        colorObj = { background: '#4a90e2', border: '#2e5c8a', highlight: { background: '#6ba3f0', border: '#4a90e2' } };
+                        colorObj = { 
+                            background: '#4a90e2', 
+                            border: isAnomaly ? borderColor : '#2e5c8a', 
+                            borderWidth: borderWidth,
+                            highlight: { background: '#6ba3f0', border: isAnomaly ? borderColor : '#4a90e2' } 
+                        };
                     } else if (activityScore < 70) {
-                        colorObj = { background: '#f5a623', border: '#d68910', highlight: { background: '#ffb84d', border: '#f5a623' } };
+                        colorObj = { 
+                            background: '#f5a623', 
+                            border: isAnomaly ? borderColor : '#d68910', 
+                            borderWidth: borderWidth,
+                            highlight: { background: '#ffb84d', border: isAnomaly ? borderColor : '#f5a623' } 
+                        };
                     } else {
-                        colorObj = { background: '#e74c3c', border: '#c0392b', highlight: { background: '#ec7063', border: '#e74c3c' } };
+                        colorObj = { 
+                            background: '#e74c3c', 
+                            border: isAnomaly ? borderColor : '#c0392b', 
+                            borderWidth: borderWidth,
+                            highlight: { background: '#ec7063', border: isAnomaly ? borderColor : '#e74c3c' } 
+                        };
                     }
                 }
             } else if (type === 'transaction') {
-                colorObj = { background: '#ff6b6b', border: '#cc5555', highlight: { background: '#ff8888', border: '#ff6b6b' } };
+                colorObj = { 
+                    background: '#ff6b6b', 
+                    border: isAnomaly ? borderColor : '#cc5555', 
+                    borderWidth: borderWidth,
+                    highlight: { background: '#ff8888', border: isAnomaly ? borderColor : '#ff6b6b' } 
+                };
             } else if (type === 'address') {
-                colorObj = { background: '#4ecdc4', border: '#3ba89f', highlight: { background: '#6eddd4', border: '#4ecdc4' } };
+                colorObj = { 
+                    background: '#4ecdc4', 
+                    border: isAnomaly ? borderColor : '#3ba89f', 
+                    borderWidth: borderWidth,
+                    highlight: { background: '#6eddd4', border: isAnomaly ? borderColor : '#4ecdc4' } 
+                };
             } else {
-                colorObj = { background: isLightTheme ? '#999999' : '#848484', border: isLightTheme ? '#777777' : '#666666' };
+                colorObj = { 
+                    background: isLightTheme ? '#999999' : '#848484', 
+                    border: isAnomaly ? borderColor : (isLightTheme ? '#777777' : '#666666'),
+                    borderWidth: borderWidth
+                };
             }
             
             // Add font color based on background brightness for better contrast
@@ -609,6 +698,17 @@
                 strokeWidth: 2,
                 strokeColor: isLightColor(bgColor) ? '#ffffff' : '#000000'
             };
+            
+            // Add shadow/glow effect for anomalies
+            if (isAnomaly) {
+                colorObj.shadow = {
+                    enabled: true,
+                    color: 'rgba(255, 0, 0, 0.5)',
+                    size: 10,
+                    x: 0,
+                    y: 0
+                };
+            }
             
             return colorObj;
         }
@@ -742,12 +842,18 @@
                 const fontColor = color.font ? color.font.color : (isLight ? '#000000' : '#ffffff');
                 const fontStrokeColor = color.font ? color.font.strokeColor : (isLight ? '#ffffff' : '#000000');
                 
+                // Extract borderWidth and shadow from color object if present
+                const borderWidth = color.borderWidth || 2;
+                const shadow = color.shadow !== undefined ? color.shadow : false;
+                
                 nodes.update({
                     id: nodeData.id,
                     color: color,
                     shape: shape,
                     size: size,
                     hidden: hidden,
+                    borderWidth: borderWidth,
+                    shadow: shadow,
                     font: {
                         size: type === 'block' ? 14 : 12,
                         color: fontColor,
@@ -1044,6 +1150,16 @@
                                     `Raw Value: ${activity.raw_value}\n` +
                                     `Color: ${activity.color_hex}\n` +
                                     `  → Node color reflects activity level`;
+                            }
+                            
+                            // Add anomaly information if available
+                            if (anomalyMetrics[nodeId] && anomalyMetrics[nodeId].is_anomaly) {
+                                const anomaly = anomalyMetrics[nodeId];
+                                tooltip += `\n\n⚠️ Anomaly Detected:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                                    `Anomaly Type: ${anomaly.anomaly_type || 'Unknown'}\n` +
+                                    `Anomaly Score: ${anomaly.anomaly_score.toFixed(1)}/100\n` +
+                                    `  → Higher score indicates more unusual pattern\n` +
+                                    `This node has been flagged as unusual compared to others`;
                             }
                             
                             return {
@@ -1672,6 +1788,43 @@
                         });
                     }
                     
+                    // Load anomaly metrics (non-blocking - may fail if insufficient data)
+                    return fetch('/api/analytics/anomalies?method=percentile')
+                        .then(response => {
+                            if (response.ok) {
+                                return response.json();
+                            } else if (response.status === 400) {
+                                // Insufficient data - this is OK, just return empty
+                                return { anomalies: [] };
+                            } else {
+                                throw new Error(`Anomaly API error: ${response.status}`);
+                            }
+                        })
+                        .then(data => {
+                            // Store anomaly metrics by node_id
+                            anomalyMetrics = {};
+                            if (data.anomalies) {
+                                data.anomalies.forEach(anomaly => {
+                                    if (anomaly.is_anomaly) {
+                                        anomalyMetrics[anomaly.node_id] = anomaly;
+                                    }
+                                });
+                            }
+                            
+                            // Update anomaly count display
+                            updateAnomalyCount();
+                            
+                            return Promise.resolve();
+                        })
+                        .catch(error => {
+                            // Anomaly detection failed (likely insufficient data) - this is OK
+                            console.log('Anomaly detection skipped:', error.message);
+                            anomalyMetrics = {};
+                            updateAnomalyCount();
+                            return Promise.resolve();
+                        });
+                })
+                .then(() => {
                     showAnalyticsLoading(false);
                     isLoadingAnalytics = false;
                 })
@@ -1716,13 +1869,35 @@
                 .then(data => {
                     // Wait a bit for recalculation, then reload
                     setTimeout(() => {
-                        loadAnalyticsData();
+                        loadAnalyticsData().then(() => {
+                            // Update node styles after reloading analytics
+                            updateNodeStyles();
+                        });
                     }, 500);
                 })
                 .catch(error => {
                     console.error('Error recalculating analytics:', error);
                     showAnalyticsLoading(false);
                 });
+        }
+        
+        function toggleAnomalyHighlighting(event) {
+            showAnomalies = event.target.checked;
+            updateNodeStyles();
+        }
+        
+        function updateAnomalyCount() {
+            const countEl = document.getElementById('anomaly-count');
+            if (countEl) {
+                const count = Object.keys(anomalyMetrics).length;
+                if (count > 0) {
+                    countEl.textContent = `(${count})`;
+                    countEl.style.display = 'inline';
+                } else {
+                    countEl.textContent = '';
+                    countEl.style.display = 'none';
+                }
+            }
         }
         
         function showAnalyticsLoading(show) {
@@ -1887,6 +2062,7 @@
         window.toggleAnalyticsHelp = toggleAnalyticsHelp;
         window.showColorSchemeHelp = showColorSchemeHelp;
         window.hideColorSchemeHelp = hideColorSchemeHelp;
+        window.toggleAnomalyHighlighting = toggleAnomalyHighlighting;
         
         // Initialize - wait for DOM to be ready
         if (document.readyState === 'loading') {

@@ -140,7 +140,7 @@ This document provides an actionable, dependency-ordered task list for implement
 - [X] T035 [US3] Implement store_anomaly_attributes() method in src/analytics_engine.py to store is_anomaly, anomaly_score, anomaly_type as node attributes in NetworkX graph
 - [X] T036 [US3] Implement get_anomalies() API method in src/analytics_engine.py to return anomaly detection results filtered by node_type and method parameter
 - [X] T037 [US3] Implement GET /api/analytics/anomalies endpoint in src/web_server.py to return anomaly detection JSON response per contracts/api.yaml schema with method and threshold parameters, returning 400 error if < 10 nodes
-- [ ] T038 [US3] Add anomaly highlighting visualization to static/index.html to visually distinguish anomalous nodes using border, glow effect, or distinct styling
+- [X] T038 [US3] Add anomaly highlighting visualization to static/index.html to visually distinguish anomalous nodes using border, glow effect, or distinct styling
 
 ---
 

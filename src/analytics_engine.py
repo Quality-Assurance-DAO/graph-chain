@@ -589,19 +589,23 @@ class AnalyticsEngine:
             
             if metric_type == 'transaction_count':
                 actual_value = float(self.calculate_type_specific_degree(node_id))
-                anomaly_type = 'high_transaction_count'
             else:
                 total_value = 0
                 for _, _, edge_data in self.graph.out_edges(node_id, data=True):
                     if edge_data.get('type') == 'tx_output':
                         total_value += edge_data.get('weight', 0)
                 actual_value = float(total_value)
-                anomaly_type = 'high_transaction_value'
             
             z_score = abs(actual_value - mean) / std if std > 0 else 0
             is_anomaly = z_score > threshold
             
             if is_anomaly:
+                # Determine anomaly type based on whether value is high or low
+                if metric_type == 'transaction_count':
+                    anomaly_type = 'high_transaction_count' if actual_value > mean else 'low_transaction_count'
+                else:
+                    anomaly_type = 'high_transaction_value' if actual_value > mean else 'low_transaction_value'
+                
                 # Calculate anomaly score (0-100)
                 anomaly_score = min(100, (z_score / threshold) * 50)
                 
@@ -649,14 +653,26 @@ class AnalyticsEngine:
             
             if metric_type == 'transaction_count':
                 actual_value = float(self.calculate_type_specific_degree(node_id))
-                anomaly_type = 'high_transaction_count'
+                # Determine anomaly type based on whether value is high or low
+                if actual_value > p95:
+                    anomaly_type = 'high_transaction_count'
+                elif actual_value < p5:
+                    anomaly_type = 'low_transaction_count'
+                else:
+                    anomaly_type = None  # Not an anomaly
             else:
                 total_value = 0
                 for _, _, edge_data in self.graph.out_edges(node_id, data=True):
                     if edge_data.get('type') == 'tx_output':
                         total_value += edge_data.get('weight', 0)
                 actual_value = float(total_value)
-                anomaly_type = 'high_transaction_value'
+                # Determine anomaly type based on whether value is high or low
+                if actual_value > p95:
+                    anomaly_type = 'high_transaction_value'
+                elif actual_value < p5:
+                    anomaly_type = 'low_transaction_value'
+                else:
+                    anomaly_type = None  # Not an anomaly
             
             is_anomaly = actual_value > p95 or actual_value < p5
             
@@ -714,18 +730,22 @@ class AnalyticsEngine:
             
             if metric_type == 'transaction_count':
                 actual_value = float(self.calculate_type_specific_degree(node_id))
-                anomaly_type = 'high_transaction_count'
             else:
                 total_value = 0
                 for _, _, edge_data in self.graph.out_edges(node_id, data=True):
                     if edge_data.get('type') == 'tx_output':
                         total_value += edge_data.get('weight', 0)
                 actual_value = float(total_value)
-                anomaly_type = 'high_transaction_value'
             
             is_anomaly = actual_value > threshold_value
             
             if is_anomaly:
+                # Threshold method only flags high values, so always high anomaly type
+                if metric_type == 'transaction_count':
+                    anomaly_type = 'high_transaction_count'
+                else:
+                    anomaly_type = 'high_transaction_value'
+                
                 # Calculate anomaly score
                 score_factor = (actual_value - threshold_value) / threshold_value if threshold_value > 0 else 1.0
                 anomaly_score = min(100, 50 + (score_factor * 50))

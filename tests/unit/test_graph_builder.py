@@ -146,3 +146,4 @@ def test_to_pyvis(graph_builder, sample_block):
     assert 'edges' in pyvis_data
     assert len(pyvis_data['nodes']) == 1
 
+

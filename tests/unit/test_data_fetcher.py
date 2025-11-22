@@ -138,3 +138,4 @@ def test_fetch_and_update_skip_duplicate_block(data_fetcher, mock_api_client):
     # Should return True (not an error, just no new data)
     assert result is True
 
+

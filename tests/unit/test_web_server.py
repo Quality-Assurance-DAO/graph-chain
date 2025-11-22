@@ -78,3 +78,4 @@ def test_graph_updates_sse_route(client):
     assert response.status_code == 200
     assert response.content_type == 'text/event-stream; charset=utf-8'
 
+

@@ -140,3 +140,4 @@ class Transaction:
             'timestamp': self.timestamp.isoformat() if isinstance(self.timestamp, datetime) else self.timestamp,
         }
 
+

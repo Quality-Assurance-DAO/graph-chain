@@ -189,3 +189,4 @@ def test_get_flow_paths_empty(analytics_engine):
     paths = analytics_engine.get_flow_paths(max_depth=5, max_blocks=5)
     assert isinstance(paths, list)
 
+

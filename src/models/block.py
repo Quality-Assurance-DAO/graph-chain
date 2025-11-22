@@ -57,3 +57,4 @@ class Block:
             'tx_count': self.tx_count,
         }
 
+

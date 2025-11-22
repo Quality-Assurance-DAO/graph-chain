@@ -8,16 +8,94 @@ This project provides a real-time visualization of Cardano blockchain activity, 
 
 ## Features
 
-- **Real-time Visualization**: See new blocks and transactions appear automatically as they occur on the blockchain
-- **Transaction Flow Tracking**: Trace how value moves between addresses through transaction connections
-- **Graceful Error Handling**: Automatic recovery from API rate limits and network issues
-- **Interactive Graph**: Explore blockchain relationships with an interactive network visualization
-- **Graph Analytics**: Lightweight local analytics on loaded data including:
-  - **Node Degree Metrics**: View transaction counts per block, input/output counts per transaction
-  - **Color-Coded Activity**: Visual heatmaps showing activity levels (heatmap, activity, grayscale schemes)
-  - **Anomaly Detection**: Identify unusually large transactions or blocks with high transaction counts
-  - **Clustering**: Discover clusters of related addresses or transactions
-  - **Flow Path Visualization**: Click transactions to see value flow paths through the graph
+### Real-time Visualization
+
+The system continuously polls the Cardano blockchain via Blockfrost API and automatically adds new blocks, transactions, and addresses to the graph as they appear on-chain. New nodes animate into view, and the graph updates in real-time using Server-Sent Events (SSE) for seamless updates without page refreshes. This allows you to watch blockchain activity unfold live, seeing blocks being created and transactions being processed as they happen.
+
+### Transaction Flow Tracking
+
+Visualize how value (ADA and tokens) moves through the blockchain by following connections between addresses and transactions. Each transaction node connects to its input addresses (sources of funds) and output addresses (destinations). The graph structure makes it easy to trace value flow paths, understand transaction relationships, and identify patterns in how addresses interact with each other. Edge labels show transaction amounts, making it clear how much value moves along each connection.
+
+### Graceful Error Handling
+
+The system handles API limitations and network issues gracefully. When rate limits are encountered, it automatically implements exponential backoff and pauses polling until the rate limit window expires. If the API becomes temporarily unavailable, the system continues displaying existing graph data while attempting to reconnect. Status indicators show the current system state (active, paused, error) and provide clear feedback about any issues without disrupting the user experience.
+
+### Interactive Graph
+
+Explore blockchain relationships through an interactive network visualization powered by PyVis. Features include:
+- **Zoom and Pan**: Navigate large graphs smoothly
+- **Node Interaction**: Hover over nodes to highlight connected nodes and edges
+- **Click to Focus**: Click any node to center the view and highlight its connections
+- **Browse Panel**: Search and filter nodes by type (blocks, transactions, addresses)
+- **Theme Toggle**: Switch between light and dark themes
+- **View Modes**: Toggle between Block View (high-level block chain) and Transaction View (detailed transaction flows)
+
+### Graph Analytics
+
+Perform lightweight local analytics on the loaded data subset to gain insights into blockchain patterns:
+
+#### Node Degree Metrics
+
+Understand activity levels by viewing connection counts for each node:
+- **Block Nodes**: Display the number of transactions contained in each block, helping identify "busy" blocks with high transaction volumes
+- **Transaction Nodes**: Show input and output counts, revealing transactions with many inputs/outputs
+- **Address Nodes**: Display UTxO (Unspent Transaction Output) counts, indicating address activity
+
+Metrics appear in node labels and detailed tooltips, making it easy to identify high-activity nodes at a glance.
+
+#### Color-Coded Activity
+
+Visual heatmaps use color intensity to represent activity levels without reading numerical values:
+- **Heatmap Scheme** (default): Red (low activity) → Yellow (medium) → Green (high activity)
+- **Activity Scheme**: Blue (low) → Purple (medium) → Red (high)
+- **Grayscale Scheme**: Black (low) → Gray → White (high) - useful for printing or colorblind accessibility
+
+Colors are calculated based on:
+- **Blocks**: Transaction count per block
+- **Transactions**: Total input/output count
+- **Addresses**: UTxO count
+
+Switch between color schemes using the dropdown selector in the analytics panel.
+
+#### Anomaly Detection
+
+Identify unusual patterns in blockchain data using statistical methods:
+- **Percentile Method** (default): Flags nodes above the 95th percentile or below the 5th percentile
+- **Z-Score Method**: Detects nodes where values deviate significantly from the mean (|value - mean| > 2 * std)
+- **Threshold Method**: Flags nodes exceeding a configurable threshold multiplier of the average
+
+Anomalous nodes are visually highlighted with:
+- Thick red borders
+- Glow/shadow effects
+- Anomaly count display in the analytics panel
+
+**Note**: Requires minimum 10 nodes for statistical validity. Useful for spotting unusually large transactions, blocks with abnormally high transaction counts, or other outliers that might warrant investigation.
+
+#### Clustering
+
+Discover groups of related addresses or transactions that frequently interact:
+- **Address Clustering**: Groups addresses that frequently transact with each other within a time window (default: last 30 blocks, configurable: 20-50 blocks)
+- **Transaction Clustering**: Groups transactions that share common addresses, revealing transaction patterns
+
+Clusters are identified using NetworkX's community detection algorithms (greedy modularity communities). Each cluster is assigned a unique color, making it easy to visually distinguish different groups. This helps identify:
+- Related wallet addresses
+- Transaction patterns
+- Repeated interaction groups
+- Potential address relationships
+
+#### Flow Path Visualization
+
+Trace how value flows through the blockchain by clicking on any transaction node:
+- **Path Highlighting**: Green edges highlight the complete flow path from input addresses through the transaction to output addresses
+- **Path Discovery**: Automatically finds paths up to 5-10 hops deep through recent blocks (last 5-10 blocks)
+- **Value Aggregation**: Shows total value flowing along each path
+- **Interactive Exploration**: Click anywhere else to clear the visualization and explore different transactions
+
+This feature helps understand:
+- How value moves through multiple transactions
+- Common flow patterns in recent blocks
+- Transaction relationships and dependencies
+- Value routing through the network
 
 ## Quick Start
 

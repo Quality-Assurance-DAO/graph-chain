@@ -81,11 +81,11 @@ This document provides an actionable, dependency-ordered task list for implement
 - [X] T014 [US1] Implement store_degree_metrics() method in src/analytics_engine.py to store degree metrics as node attributes (degree, in_degree, out_degree, type_degree) in NetworkX graph
 - [X] T015 [US1] Implement get_degree_metrics() API method in src/analytics_engine.py to return degree metrics filtered by node_type or node_id
 - [X] T016 [US1] Implement GET /api/analytics/degrees endpoint in src/web_server.py to return degree metrics JSON response per contracts/api.yaml schema
-- [ ] T017 [US1] Add degree metrics display to static/index.html to show transaction counts on block nodes and input/output counts on transaction nodes in node labels or tooltips
+- [X] T017 [US1] Add degree metrics display to static/index.html to show transaction counts on block nodes and input/output counts on transaction nodes in node labels or tooltips
 - [X] T018 [US1] Integrate AnalyticsEngine with GraphBuilder in src/web_server.py by creating AnalyticsEngine instance wrapping graph_builder
 - [X] T019 [US1] Add unit tests for calculate_node_degrees() in tests/unit/test_analytics_engine.py with sample graph data
 - [X] T020 [US1] Add unit tests for get_degree_metrics() filtering in tests/unit/test_analytics_engine.py
-- [ ] T021 [US1] Add integration test for GET /api/analytics/degrees endpoint in tests/integration/test_end_to_end.py
+- [X] T021 [US1] Add integration test for GET /api/analytics/degrees endpoint in tests/integration/test_end_to_end.py
 
 ---
 
@@ -111,8 +111,8 @@ This document provides an actionable, dependency-ordered task list for implement
 - [X] T025 [US2] Implement store_color_attributes() method in src/analytics_engine.py to store color_hex and color_scheme as node attributes in NetworkX graph
 - [X] T026 [US2] Implement get_activity_metrics() API method in src/analytics_engine.py to return activity metrics and color mappings filtered by node_type and color_scheme
 - [X] T027 [US2] Implement GET /api/analytics/activity endpoint in src/web_server.py to return activity metrics JSON response per contracts/api.yaml schema with color_scheme parameter support
-- [ ] T028 [US2] Add color coding visualization to static/index.html to apply node colors from activity metrics API response using PyVis node color attribute
-- [ ] T029 [US2] Add color scheme selector UI control to static/index.html allowing users to switch between heatmap, activity, and grayscale schemes
+- [X] T028 [US2] Add color coding visualization to static/index.html to apply node colors from activity metrics API response using PyVis node color attribute
+- [X] T029 [US2] Add color scheme selector UI control to static/index.html allowing users to switch between heatmap, activity, and grayscale schemes
 
 ---
 
@@ -193,7 +193,7 @@ This document provides an actionable, dependency-ordered task list for implement
 - [X] T050 [US5] Implement limit_path_depth() method in src/analytics_engine.py to limit paths to max_depth (5-10 hops) and filter to recent blocks (last 5-10 blocks)
 - [X] T051 [US5] Implement get_flow_paths() API method in src/analytics_engine.py to return flow paths filtered by start_address, transaction_id, max_depth, and max_blocks parameters
 - [X] T052 [US5] Implement GET /api/analytics/flow endpoint in src/web_server.py to return flow paths JSON response per contracts/api.yaml schema with query parameters
-- [ ] T053 [US5] Add flow path visualization to static/index.html to highlight flow paths when user clicks a transaction node, showing path edges with distinct colors and widths
+- [X] T053 [US5] Add flow path visualization to static/index.html to highlight flow paths when user clicks a transaction node, showing path edges with distinct colors and widths
 
 ---
 
@@ -208,8 +208,8 @@ This document provides an actionable, dependency-ordered task list for implement
 - [X] T054 Implement POST /api/analytics/recalculate endpoint in src/web_server.py to trigger recalculation of all analytics metrics asynchronously, returning 202 Accepted response
 - [X] T055 Add comprehensive unit tests for all analytics calculation methods in tests/unit/test_analytics_engine.py covering edge cases (empty graphs, single node, identical values, etc.)
 - [X] T056 Add integration tests for all analytics API endpoints in tests/integration/test_end_to_end.py verifying end-to-end data flow
-- [ ] T057 Add loading indicator UI component to static/index.html to show spinner/progress message during analytics calculations
-- [ ] T058 Update README.md with analytics feature documentation including API usage examples and quickstart guide reference
+- [X] T057 Add loading indicator UI component to static/index.html to show spinner/progress message during analytics calculations
+- [X] T058 Update README.md with analytics feature documentation including API usage examples and quickstart guide reference
 
 ---
 

@@ -16,6 +16,7 @@ import socket
 from flask import Flask, jsonify, Response, send_from_directory, request
 from src.graph_builder import GraphBuilder
 from src.data_fetcher import DataFetcher
+from src.analytics_engine import AnalyticsEngine
 from src.config import validate_config, SERVER_PORT
 
 # Setup logging (T040)
@@ -36,6 +37,7 @@ app = Flask(__name__, static_folder=str(static_folder_path))
 # Initialize graph and data fetcher
 graph_builder = GraphBuilder()
 data_fetcher = DataFetcher(graph_builder)
+analytics_engine = AnalyticsEngine(graph_builder)
 
 # Store update events for SSE
 update_queue = []
@@ -223,6 +225,215 @@ def get_node(node_id):
         })
     except Exception as e:
         logger.error(f"Error getting node: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/analytics/degrees')
+def get_analytics_degrees():
+    """Get node degree metrics."""
+    try:
+        node_type = request.args.get('node_type')
+        node_id = request.args.get('node_id')
+        
+        metrics = analytics_engine.get_degree_metrics(node_type=node_type, node_id=node_id)
+        
+        # Calculate statistics
+        total_nodes = len(analytics_engine.graph.nodes())
+        nodes_by_type = {}
+        for node_id in analytics_engine.graph.nodes():
+            node_type = analytics_engine.graph.nodes[node_id].get('type', 'unknown')
+            nodes_by_type[node_type] = nodes_by_type.get(node_type, 0) + 1
+        
+        return jsonify({
+            'metrics': metrics,
+            'statistics': {
+                'total_nodes': total_nodes,
+                'nodes_by_type': nodes_by_type,
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error getting degree metrics: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/analytics/activity')
+def get_analytics_activity():
+    """Get activity metrics and color mappings."""
+    try:
+        node_type = request.args.get('node_type')
+        color_scheme = request.args.get('color_scheme', 'heatmap')
+        
+        if color_scheme not in ['heatmap', 'activity', 'grayscale']:
+            color_scheme = 'heatmap'
+        
+        metrics = analytics_engine.get_activity_metrics(node_type=node_type, color_scheme=color_scheme)
+        
+        # Calculate normalization stats
+        normalization_stats = {}
+        if metrics:
+            raw_values = [m['raw_value'] for m in metrics]
+            if raw_values:
+                normalization_stats = {
+                    'min_value': min(raw_values),
+                    'max_value': max(raw_values),
+                    'mean_value': sum(raw_values) / len(raw_values),
+                }
+        
+        return jsonify({
+            'metrics': metrics,
+            'color_scheme': color_scheme,
+            'normalization_stats': normalization_stats,
+        })
+    except Exception as e:
+        logger.error(f"Error getting activity metrics: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/analytics/anomalies')
+def get_analytics_anomalies():
+    """Detect anomalies in loaded data."""
+    try:
+        node_type = request.args.get('node_type')
+        method = request.args.get('method', 'percentile')
+        threshold = float(request.args.get('threshold', '2.0'))
+        
+        if method not in ['zscore', 'percentile', 'threshold']:
+            method = 'percentile'
+        
+        # Check minimum node count
+        if node_type:
+            node_count = sum(1 for nid in analytics_engine.graph.nodes() 
+                           if analytics_engine.graph.nodes[nid].get('type') == node_type)
+        else:
+            node_count = len(analytics_engine.graph.nodes())
+        
+        if node_count < 10:
+            return jsonify({
+                'error': 'INSUFFICIENT_DATA',
+                'message': 'Anomaly detection requires at least 10 nodes',
+                'details': {'node_count': node_count}
+            }), 400
+        
+        anomalies = analytics_engine.get_anomalies(node_type=node_type, method=method, threshold=threshold)
+        
+        # Get statistics for response
+        statistics = {}
+        if node_type == 'block' or not node_type:
+            stats = analytics_engine.calculate_statistics('block', 'transaction_count')
+            statistics['block'] = stats
+        if node_type == 'transaction' or not node_type:
+            stats = analytics_engine.calculate_statistics('transaction', 'value')
+            statistics['transaction'] = stats
+        
+        return jsonify({
+            'anomalies': anomalies,
+            'method': method,
+            'statistics': statistics,
+            'total_nodes_analyzed': node_count,
+        })
+    except Exception as e:
+        logger.error(f"Error detecting anomalies: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/analytics/clusters')
+def get_analytics_clusters():
+    """Perform clustering analysis."""
+    try:
+        cluster_type = request.args.get('cluster_type')
+        time_window_blocks = int(request.args.get('time_window_blocks', '30'))
+        
+        if not cluster_type:
+            return jsonify({
+                'error': 'MISSING_PARAMETER',
+                'message': 'cluster_type parameter is required'
+            }), 400
+        
+        if cluster_type not in ['address', 'transaction']:
+            return jsonify({
+                'error': 'INVALID_PARAMETER',
+                'message': 'cluster_type must be "address" or "transaction"'
+            }), 400
+        
+        if time_window_blocks < 20 or time_window_blocks > 50:
+            return jsonify({
+                'error': 'INVALID_PARAMETER',
+                'message': 'time_window_blocks must be between 20 and 50'
+            }), 400
+        
+        result = analytics_engine.get_clusters(cluster_type, time_window_blocks)
+        
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error getting clusters: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/analytics/flow')
+def get_analytics_flow():
+    """Get transaction flow paths."""
+    try:
+        start_address = request.args.get('start_address')
+        transaction_id = request.args.get('transaction_id')
+        max_depth = int(request.args.get('max_depth', '5'))
+        max_blocks = int(request.args.get('max_blocks', '5'))
+        
+        if max_depth < 1 or max_depth > 10:
+            max_depth = 5
+        if max_blocks < 1 or max_blocks > 10:
+            max_blocks = 5
+        
+        # Check if nodes exist
+        if start_address and not analytics_engine.graph.has_node(start_address):
+            return jsonify({
+                'error': 'NODE_NOT_FOUND',
+                'message': f'Start address {start_address} not found'
+            }), 404
+        
+        if transaction_id and not analytics_engine.graph.has_node(transaction_id):
+            return jsonify({
+                'error': 'NODE_NOT_FOUND',
+                'message': f'Transaction {transaction_id} not found'
+            }), 404
+        
+        paths = analytics_engine.get_flow_paths(
+            start_address=start_address,
+            transaction_id=transaction_id,
+            max_depth=max_depth,
+            max_blocks=max_blocks
+        )
+        
+        return jsonify({
+            'paths': paths,
+            'total_paths': len(paths),
+            'max_depth': max_depth,
+            'blocks_analyzed': max_blocks,
+        })
+    except Exception as e:
+        logger.error(f"Error getting flow paths: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/analytics/recalculate', methods=['POST'])
+def recalculate_analytics():
+    """Recalculate all analytics metrics."""
+    try:
+        # Mark all metrics as dirty to force recalculation
+        for key in analytics_engine._dirty_flags:
+            analytics_engine._dirty_flags[key] = True
+        
+        # Clear caches
+        analytics_engine._degree_cache.clear()
+        analytics_engine._activity_cache.clear()
+        analytics_engine._anomaly_cache.clear()
+        analytics_engine._cluster_cache.clear()
+        
+        return jsonify({
+            'status': 'recalculating',
+            'message': 'Analytics recalculation started'
+        }), 202
+    except Exception as e:
+        logger.error(f"Error recalculating analytics: {e}")
         return jsonify({'error': str(e)}), 500
 
 
